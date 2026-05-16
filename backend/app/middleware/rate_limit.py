@@ -122,10 +122,57 @@ class InMemoryBackend(RateLimitBackend):
         if empty_keys:
             logger.debug("Rate limiter cleanup: removed %d stale keys", len(empty_keys))
 
+class RedisBackend(RateLimitBackend):
+    def __init__(self, redis_url: str):
+        import redis.asyncio as redis
+        self.redis = redis.from_url(redis_url, decode_responses=True)
+
+    async def is_allowed(self, key: str, max_requests: int, window_seconds: int):
+        now = time.time()
+        window_start = now - window_seconds
+
+        await self.redis.zremrangebyscore(key, 0, window_start)
+
+        current_count = await self.redis.zcard(key)
+
+        if current_count >= max_requests:
+            ttl = await self.redis.ttl(key)
+            return False, {
+                "remaining": 0,
+                "limit": max_requests,
+                "reset": ttl if ttl > 0 else window_seconds,
+                "window": window_seconds,
+            }
+
+        await self.redis.zadd(key, {str(now): now})
+        await self.redis.expire(key, window_seconds)
+
+        return True, {
+            "remaining": max_requests - current_count - 1,
+            "limit": max_requests,
+            "reset": window_seconds,
+            "window": window_seconds,
+        }
+
+    async def cleanup(self) -> None:
+        """
+        Redis handles cleanup automatically using key expiration.
+        No manual clean up required for sliding window rate limiting.
+        """
+        return
+        
+    
+        
 
 # ── Singleton backend ─────────────────────────────────────────────────────────
 
-_backend = InMemoryBackend()
+
+settings = get_settings()
+
+if settings.redis_url:
+    _backend = RedisBackend(settings.redis_url)
+else:
+    _backend = InMemoryBackend()
 
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
