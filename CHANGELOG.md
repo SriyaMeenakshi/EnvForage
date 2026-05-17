@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-16
+
+### Added
+- **Phase 6 — Production Infrastructure.**
+  - `docker-compose.prod.yml`: production Compose with PostgreSQL, Redis, and
+    the FastAPI API service. DB and Redis ports not exposed to host. All secrets
+    via env vars. Services use `restart: always` and healthchecks.
+  - `RedisBackend` in `rate_limit.py`: implements `RateLimitBackend` ABC using
+    a Redis sorted set (sliding window). Auto-selected when `REDIS_URL` is set,
+    falls back to `InMemoryBackend` in development. Fixes rate limit correctness
+    across multiple uvicorn workers.
+  - `redis_url` config field in `config.py`: optional (`None` by default),
+    no changes required to existing dev/test environments.
+  - `.env.prod` template for production secrets.
+
+### Fixed
+- `FRAMEWORK_CUDA_SUPPORT["tensorflow"]["2.15.0"]` corrected from `"12.1"` to
+  `"12.2"` — TF 2.15 ships with CUDA 12.2, not 12.1.
+- `PYTHON_MATRIX["tensorflow"]["2.15.0"]["supported_cuda"]` corrected to match.
+
+### Added (Compatibility Matrix)
+- CUDA 12.2 and 12.3 entries added to `CUDA_MATRIX` and `cuda_matrix.yaml`.
+- TF 2.16.0, 2.16.1, 2.17.0, 2.18.0 added to `FRAMEWORK_CUDA_SUPPORT` and
+  `PYTHON_MATRIX` with CUDA 12.3 and Python 3.9–3.12 support.
+  Resolves TODO left in Phase 1.
+
 ## [0.4.0] - 2026-05-14
 
 ### Added

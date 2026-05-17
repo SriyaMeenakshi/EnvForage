@@ -2,13 +2,13 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.ai.models import TroubleshootRequest, TroubleshootResponse
 from app.ai.providers.base import LLMProviderError
 from app.ai.service import AITroubleshootService
 from app.api.deps import DB
 from app.middleware.rate_limit import ai_rate_limit
-from app.templates.safety import SafetyViolationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,40 +19,47 @@ _service = AITroubleshootService()
 
 @router.post(
     "/troubleshoot",
-    response_model=TroubleshootResponse,
     status_code=201,
-    summary="AI-assisted environment troubleshooting",
+    summary="AI-assisted environment troubleshooting (streaming)",
     description=(
-        "Submit a diagnostic report and receive AI-generated root cause analysis "
-        "with ordered fix suggestions. All AI output is validated through the "
-        "SafetyFilter before being returned."
+        "Submit a diagnostic report and receive a streaming AI-generated "
+        "root cause analysis. Returns a text/event-stream of JSON tokens."
     ),
     responses={
-        201: {"description": "Troubleshooting analysis completed successfully"},
-        422: {"description": "Invalid request payload"},
-        500: {"description": "LLM provider error or safety violation"},
-        503: {"description": "AI service temporarily unavailable"},
-        429: {"description": "Rate limit exceeded (10 requests/min)"},
+        201: {"description": "Streaming troubleshoot analysis started"},
+        500: {"description": "Internal error"},
+        503: {"description": "AI service unavailable"},
+        429: {"description": "Rate limit exceeded"},
     },
 )
 async def troubleshoot(
     request: TroubleshootRequest,
     db: DB,
     _rate_limit: None = Depends(ai_rate_limit),
-) -> TroubleshootResponse:
+):
     """
-    Accept a structured diagnostic report and return AI-powered
-    troubleshooting analysis with fix suggestions.
-
-    The AI output is:
-    - Structured as validated Pydantic models (never raw text)
-    - Filtered through SafetyFilter (no destructive commands)
-    - Persisted to the ai_sessions table for audit trail
-    - Rate-limited (10 requests per minute per IP)
+    Accept a structured diagnostic report and return a stream of AI-powered
+    troubleshooting tokens via Server-Sent Events (SSE).
     """
     try:
-        result = await _service.troubleshoot(request, db)
-        return result
+        async def event_generator():
+            try:
+                async for chunk in _service.stream_troubleshoot(request, db):
+                    # Format as standard SSE
+                    yield f"data: {chunk}\n\n"
+            except Exception as exc:
+                logger.error("Error in troubleshoot stream generator: %s", exc)
+                yield f"data: {{\"error\": \"STREAM_ERROR\", \"message\": \"{str(exc)}\"}}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable buffering for Nginx
+            }
+        )
 
     except LLMProviderError as exc:
         logger.error("LLM provider error: %s", exc)
@@ -62,19 +69,6 @@ async def troubleshoot(
                 "error": "AI_SERVICE_UNAVAILABLE",
                 "message": f"AI provider error: {exc.reason}",
                 "provider": exc.provider,
-            },
-        ) from exc
-
-    except SafetyViolationError as exc:
-        logger.critical("AI safety violation blocked: %s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "AI_SAFETY_VIOLATION",
-                "message": (
-                    "The AI response was blocked by the safety filter. "
-                    "This incident has been logged for review."
-                ),
             },
         ) from exc
 

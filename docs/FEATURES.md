@@ -1,8 +1,8 @@
 # EnvForge — Feature Specifications
 
-> **Version**: 0.3.0
-> **Status**: Phase 1 & 3 Implemented
-> **Last Updated**: 2026-05-14
+> **Version**: 0.3.1
+> **Status**: Phase 1, 3 & Production Infrastructure Implemented
+> **Last Updated**: 2026-05-16
 
 ---
 
@@ -13,9 +13,10 @@
 | Web Application (Frontend) | ✅ Implemented | Phase 3 |
 | Environment Profiles | ✅ Implemented | Phase 1 & 3 |
 | Script Generation | ✅ Implemented | Phase 1 & 3 |
-| Diagnostic Report Ingestion | ✅ Implemented (backend + frontend) | Phase 1 & 3 |
+| Diagnostic Report Ingestion | ✅ Implemented | Phase 1 & 3 |
 | Environment Verification | 🔲 Planned | Phase 5 |
-| AI Troubleshooting Layer | 🔲 Skeleton only | Phase 4 |
+| AI Troubleshooting Layer | 🔶 In Progress | Phase 4 |
+| Production Infrastructure | ✅ Implemented | Phase 6 |
 
 ---
 
@@ -113,6 +114,7 @@ class ProfileDetailSchema(ProfileSummarySchema):
 | `Dockerfile` | `config/dockerfile.j2` | Containerized environment |
 | `devcontainer.json` | `config/devcontainer.j2` | VS Code Dev Container config |
 | `verify_torch.sh` | `verify/verify_torch.sh.j2` | PyTorch CUDA verification |
+| `environment.yml` | `config/environment.yml.j2` | Conda environment export |
 
 ### Generation Pipeline (Implemented)
 
@@ -349,6 +351,33 @@ result = await provider.complete(system_prompt, user_msg, TroubleshootResponse)
 - **Diagnostic Dashboard**: Paste CLI agent JSON output to visualize hardware (OS, CPU, GPU, CUDA), run compatibility checks against any profile, and view structured issues with severity badges and suggested fixes. Compatible profiles are rendered as clickable links to the Script Wizard.
 - **API Integration**: Connects securely to the FastAPI backend (`/api/v1`). All TypeScript interfaces are strictly aligned with backend Pydantic schemas.
 - **Deployment**: Configured for Vercel production deployment with proper `NEXT_PUBLIC_API_URL` configuration.
+
+---
+
+## Feature 7: Production Infrastructure
+
+### Status: ✅ Implemented (Phase 6)
+
+**Files**: `docker-compose.prod.yml`, `backend/app/middleware/rate_limit.py`,
+`backend/app/config.py`, `.env.prod`
+
+### Components
+
+| Component | Implementation |
+|-----------|---------------|
+| Production Compose | `docker-compose.prod.yml` — PostgreSQL 16, Redis 7, FastAPI API |
+| Redis Rate Limiter | `RedisBackend` in `rate_limit.py` — sliding window via sorted set |
+| Config | `redis_url` field added to `Settings`; optional, defaults to `None` |
+| Secrets Template | `.env.prod` — all secrets via env vars, never hardcoded |
+
+### Design Decisions
+- DB and Redis ports are **not** exposed in production — only reachable inside
+  the Compose network.
+- `RedisBackend` is auto-selected when `REDIS_URL` is set. No code changes
+  needed in dev — `InMemoryBackend` remains the default.
+- `--reload` removed in production; `--workers 2` used instead.
+- Rate limit correctness across multiple workers requires Redis — in-memory
+  state is per-process and would allow 2× the intended limit with 2 workers.
 
 ---
 

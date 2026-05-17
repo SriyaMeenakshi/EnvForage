@@ -54,6 +54,7 @@ export default function TroubleshootPage() {
   const [profileSlug, setProfileSlug] = useState("pytorch-cuda");
   const [userDescription, setUserDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TroubleshootResponse | null>(null);
   const [expandedFix, setExpandedFix] = useState<number | null>(null);
@@ -66,6 +67,7 @@ export default function TroubleshootPage() {
   const handleSubmit = async () => {
     setError(null);
     setResult(null);
+    setStreamingText("");
     setRepairScripts({});
 
     // Validate JSON
@@ -87,7 +89,11 @@ export default function TroubleshootPage() {
         profile_slug: profileSlug || undefined,
         user_description: userDescription || undefined,
       };
-      const response = await api.troubleshoot(request);
+      
+      const response = await api.troubleshoot(request, (token) => {
+        setStreamingText((prev) => prev + token);
+      });
+      
       setResult(response);
       // Auto-expand the first fix
       if (response.suggested_fixes.length > 0) {
@@ -97,6 +103,7 @@ export default function TroubleshootPage() {
       setError(err.message || "AI troubleshooting failed. Check that the backend is running.");
     } finally {
       setLoading(false);
+      setStreamingText("");
     }
   };
 
@@ -261,6 +268,36 @@ export default function TroubleshootPage() {
                 >
                   <AlertCircle size={16} />
                   {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Streaming Preview */}
+            <AnimatePresence>
+              {loading && streamingText && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  style={{ marginBottom: "1.5rem" }}
+                >
+                  <div className="glass-panel" style={{ padding: "1rem", background: "rgba(0,0,0,0.4)", border: "1px solid var(--brand-primary-alpha)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", color: "var(--brand-primary)", fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      <Terminal size={14} /> Live Analysis Stream
+                    </div>
+                    <pre style={{
+                      fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--text-secondary)",
+                      whiteSpace: "pre-wrap", wordBreak: "break-all", margin: 0,
+                      maxHeight: "150px", overflowY: "auto",
+                    }}>
+                      {streamingText}
+                      <motion.span
+                        animate={{ opacity: [1, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.8 }}
+                        style={{ display: "inline-block", width: "8px", height: "14px", background: "var(--brand-primary)", marginLeft: "4px", verticalAlign: "middle" }}
+                      />
+                    </pre>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

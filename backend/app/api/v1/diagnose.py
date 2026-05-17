@@ -28,6 +28,7 @@ async def diagnose(
         os_type=report.os.name.split()[0].upper()[:5] if report.os else None,
         gpu_name=report.gpus[0].name if report.gpus else None,
         cuda_version=report.cuda.version if report.cuda else None,
+        rocm_version=report.rocm.version if report.rocm else None,
         python_version=report.active_python.version[:4] if report.active_python else None,
         driver_version=report.gpus[0].driver_version if report.gpus else None,
         created_at=datetime.utcnow(),
@@ -56,9 +57,23 @@ async def diagnose(
         else:
             compatible_profiles.extend(["pytorch-cuda", "yolov8", "stable-diffusion", "llm-finetune"])
             recommendations.append(f"pytorch-cuda with CUDA {cuda_ver}")
+    elif report.rocm.version:
+        rocm_ver = report.rocm.version
+        from app.compatibility.matrix.rocm import ROCM_MATRIX
+        if rocm_ver not in ROCM_MATRIX:
+            issues.append(CompatibilityIssue(
+                severity="WARNING",
+                component="rocm",
+                message=f"ROCm {rocm_ver} is not in EnvForge's validated matrix.",
+                suggested_fix=f"Supported ROCm versions: {', '.join(ROCM_MATRIX.keys())}",
+                docs_url="https://rocm.docs.amd.com/en/latest/",
+            ))
+        else:
+            compatible_profiles.extend(["pytorch-rocm", "yolov8"])
+            recommendations.append(f"pytorch-rocm with ROCm {rocm_ver}")
     else:
         compatible_profiles.extend(["opencv-beginner", "yolov8"])
-        recommendations.append("opencv-beginner (CPU-only, no CUDA detected)")
+        recommendations.append("opencv-beginner (CPU-only, no CUDA or ROCm detected)")
 
     return DiagnoseResponse(
         report_id=str(db_report.id),

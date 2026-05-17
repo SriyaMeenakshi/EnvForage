@@ -1,0 +1,34 @@
+# ==============================================================================
+# EnvForge Generated environment.yml
+# Profile  : {{ profile.name }}
+# Python   : {{ python_version }}
+{% if cuda_version %}# CUDA     : {{ cuda_version }}
+{% endif %}# Generated: {{ generated_at }}
+# EnvForge : v{{ envforge_version }}
+#
+# Install with:
+#   conda env create -f environment.yml
+# ==============================================================================
+
+name: {{ profile.name }}
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python={{ python_version }}
+{% set pip_ns = namespace(has_pip_packages=false) %}
+{% for pkg in packages %}
+{% set spec = pkg.pip_spec %}
+{% if '+' in spec %}
+{% set pip_ns.has_pip_packages = true %}
+{% else %}  - {{ spec | replace('==', '=') }}
+{% endif %}
+{% endfor %}
+{% if pip_ns.has_pip_packages %}  - pip
+  - pip:
+{% for pkg in packages %}
+{% set spec = pkg.pip_spec %}
+{% if '+' in spec %}      - {{ spec }}
+{% endif %}
+{% endfor %}
+{% endif %}

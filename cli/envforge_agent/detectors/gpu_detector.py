@@ -16,15 +16,17 @@ from envforge_agent.schemas import GPUInfo
 
 def detect_gpus() -> list[GPUInfo]:
     """
-    Detect all NVIDIA GPUs using nvidia-smi.
-
-    Returns an empty list (not an error) if:
-    - nvidia-smi is not installed
-    - No NVIDIA GPU is present
-    - nvidia-smi fails for any reason (AMD GPU, etc.)
+    Detect all GPUs (NVIDIA or AMD).
     """
     try:
-        return _detect_via_nvidia_smi()
+        gpus = _detect_via_nvidia_smi()
+        if gpus:
+            return gpus
+    except Exception:
+        pass
+
+    try:
+        return _detect_via_rocm_smi()
     except Exception:
         return []
 
@@ -77,6 +79,61 @@ def _detect_via_nvidia_smi() -> list[GPUInfo]:
                 name=name,
                 vram_gb=vram_gb,
                 driver_version=driver if driver and driver != "[N/A]" else None,
+                index=index,
+            )
+        )
+
+    return gpus
+
+
+def _detect_via_rocm_smi() -> list[GPUInfo]:
+    """
+    Run rocm-smi and parse JSON output.
+    """
+    try:
+        result = subprocess.run(
+            ["rocm-smi", "--showproductname", "--showvram", "--showdriverversion", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except FileNotFoundError:
+        return []
+
+    if result.returncode != 0:
+        return []
+
+    import json
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return []
+
+    gpus: list[GPUInfo] = []
+    # rocm-smi JSON format varies, but usually it's a dict where keys are card0, card1...
+    for card_key, info in data.items():
+        if not card_key.startswith("card"):
+            continue
+            
+        name = info.get("Product Name", "AMD GPU")
+        vram_raw = info.get("VRAM Total Memory (B)", "0")
+        driver = info.get("Driver Version")
+        
+        try:
+            vram_gb = round(float(vram_raw) / (1024**3), 2) if vram_raw else None
+        except (ValueError, TypeError):
+            vram_gb = None
+            
+        try:
+            index = int(card_key.replace("card", ""))
+        except ValueError:
+            index = len(gpus)
+
+        gpus.append(
+            GPUInfo(
+                name=name,
+                vram_gb=vram_gb,
+                driver_version=driver,
                 index=index,
             )
         )

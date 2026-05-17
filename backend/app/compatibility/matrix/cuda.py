@@ -45,6 +45,15 @@ CUDA_MATRIX: dict[str, CUDAMatrixEntry] = {
         notes="Supports Ada Lovelace (RTX 40xx) GPUs.",
         source_url="https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/",
     ),
+    "12.3": CUDAMatrixEntry(
+        cuda_version="12.3",
+        min_driver_linux="545.23.06",
+        min_driver_windows="545.84",
+        cudnn_versions=["9.0.0", "9.1.0"],
+        supported_archs=["sm_50", "sm_60", "sm_70", "sm_75", "sm_80", "sm_86", "sm_89", "sm_90"],
+        notes="Intermediate release. Used by JAX 0.4.24–0.4.26.",
+        source_url="https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/",
+    ),
     "12.4": CUDAMatrixEntry(
         cuda_version="12.4",
         min_driver_linux="550.54.14",
@@ -64,6 +73,7 @@ SUPPORTED_CUDA_VERSIONS: list[str] = sorted(CUDA_MATRIX.keys())
 # Which CUDA versions each framework version officially supports.
 # Source: PyTorch: https://pytorch.org/get-started/previous-versions/
 #         TensorFlow: https://www.tensorflow.org/install/pip
+
 
 FRAMEWORK_CUDA_SUPPORT: dict[str, dict[str, list[str]]] = {
     "torch": {
@@ -89,7 +99,17 @@ FRAMEWORK_CUDA_SUPPORT: dict[str, dict[str, list[str]]] = {
         # TODO: Verify TF 2.16+ CUDA support
     },
     "jax": {
-        # TODO: Add JAX CUDA support matrix
+        # Source: https://jax.readthedocs.io/en/latest/installation.html
+        # Source: https://docs.jax.dev/en/latest/changelog.html
+        "0.4.1":  ["11.8"],
+        "0.4.7":  ["11.8"],
+        "0.4.14": ["11.8", "12.1"],
+        "0.4.20": ["11.8", "12.1"],
+        "0.4.23": ["11.8", "12.1"],
+        "0.4.24": ["11.8", "12.1", "12.3"],
+        "0.4.25": ["11.8", "12.1", "12.3"],
+        "0.4.26": ["12.1", "12.3"],
+        "0.4.28": ["12.1", "12.4"],
     },
 }
 

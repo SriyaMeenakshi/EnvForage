@@ -29,13 +29,14 @@ class TroubleshootPromptBuilder:
     # Maximum characters for user description (prompt injection defence)
     MAX_USER_DESC_CHARS = 500
 
-    def build(self, request: TroubleshootRequest) -> str:
+    def build(self, request: TroubleshootRequest, history: list[Any] | None = None) -> str:
         """
         Build the user message from a TroubleshootRequest.
 
         Args:
             request: The structured troubleshoot request containing
                      diagnostic data, profile info, and user description.
+            history: Optional list of previous AISuggestion objects.
 
         Returns:
             A formatted string to be passed as the ``user`` role message
@@ -53,14 +54,27 @@ class TroubleshootPromptBuilder:
         # ── Section 3: Compatibility Context ──────────────────────────────
         sections.append(self._build_compatibility_context(request))
 
-        # ── Section 4: User Description ───────────────────────────────────
+        # ── Section 4: Session History ───────────────────────────────────
+        if history:
+            sections.append(self._build_history_section(history))
+
+        # ── Section 5: User Description ───────────────────────────────────
         if request.user_description:
             sections.append(self._build_user_description(request.user_description))
 
-        # ── Section 5: Instructions ───────────────────────────────────────
+        # ── Section 6: Instructions ───────────────────────────────────────
         sections.append(self._build_instructions())
 
         return "\n\n".join(sections)
+
+    def _build_history_section(self, history: list[Any]) -> str:
+        """Serialise previous AI suggestions for conversation context."""
+        lines = ["## PREVIOUS SUGGESTIONS IN THIS SESSION"]
+        for fix in history:
+            # fix is an AISuggestion DB model
+            lines.append(f"Step {getattr(fix, 'step_number', '?')}: {getattr(fix, 'title', 'Unknown')}")
+            lines.append(f"  {getattr(fix, 'description', '')}")
+        return "\n".join(lines)
 
     # ── Private builders ──────────────────────────────────────────────────
 

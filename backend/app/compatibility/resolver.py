@@ -28,6 +28,11 @@ from app.compatibility.matrix.cuda import (
     get_cuda_entry,
     get_supported_cuda_for_framework,
 )
+from app.compatibility.matrix.rocm import (
+    ROCM_MATRIX,
+    get_rocm_entry,
+    get_supported_rocm_for_framework,
+)
 from app.compatibility.matrix.os_rules import get_os_notes, validate_output_format
 from app.compatibility.matrix.python import (
     get_framework_entry,
@@ -58,7 +63,9 @@ class CompatibilityResolver:
         target_os: OSTarget,
         profile_slug: str,
         os_support: list[str],
+        rocm_version: str | None = None,
         cuda_required: bool = False,
+        rocm_required: bool = False,
         overrides: dict[str, str] | None = None,
     ) -> ResolvedEnvironment:
         """
@@ -103,6 +110,20 @@ class CompatibilityResolver:
         if cuda_version is not None:
             self._validate_cuda_version(cuda_version)
 
+        if rocm_required and rocm_version is None:
+            raise IncompatibilityError(
+                component="rocm",
+                constraint=f"Profile '{profile_slug}' requires ROCm",
+                detected="No ROCm version specified",
+                suggestion=(
+                    "Provide a rocm_version in your request. "
+                    f"Supported: {', '.join(ROCM_MATRIX.keys())}"
+                ),
+            )
+
+        if rocm_version is not None:
+            self._validate_rocm_version(rocm_version)
+
         # Step 3: Resolve each package
         resolved_packages: list[ResolvedPackage] = []
         for constraint in packages:
@@ -110,18 +131,21 @@ class CompatibilityResolver:
                 constraint=constraint,
                 python_version=python_version,
                 cuda_version=cuda_version,
+                rocm_version=rocm_version,
                 override_version=overrides.get(constraint.name),
             )
             resolved_packages.append(resolved)
 
         # Step 4: Collect OS-specific notes
         framework_names = [p.name for p in packages]
-        os_notes = get_os_notes(target_os, cuda_required, framework_names)
+        gpu_required = cuda_required or rocm_required
+        os_notes = get_os_notes(target_os, gpu_required, framework_names)
         warnings.extend(os_notes)
 
         return ResolvedEnvironment(
             python_version=python_version,
             cuda_version=cuda_version,
+            rocm_version=rocm_version,
             target_os=target_os,
             packages=resolved_packages,
             warnings=warnings,
@@ -151,11 +175,21 @@ class CompatibilityResolver:
                 known_versions=list(CUDA_MATRIX.keys()),
             )
 
+    def _validate_rocm_version(self, rocm_version: str) -> None:
+        entry = get_rocm_entry(rocm_version)
+        if entry is None:
+            raise UnknownVersionError(
+                component="rocm",
+                version=rocm_version,
+                known_versions=list(ROCM_MATRIX.keys()),
+            )
+
     def _resolve_package(
         self,
         constraint: PackageConstraint,
         python_version: str,
         cuda_version: str | None,
+        rocm_version: str | None,
         override_version: str | None,
     ) -> ResolvedPackage:
         """
@@ -186,6 +220,7 @@ class CompatibilityResolver:
                 version=spec_version,
                 python_version=python_version,
                 cuda_version=cuda_version,
+                rocm_version=rocm_version,
             )
 
         # Range spec — find the latest compatible version within range
@@ -194,13 +229,16 @@ class CompatibilityResolver:
             framework=package_name,
             python_version=python_version,
             cuda_version=cuda_version,
+            rocm_version=rocm_version,
         )
         if latest is not None:
-            cuda_variant = self._resolve_cuda_variant(package_name, latest, cuda_version)
+            gpu_variant = self._resolve_gpu_variant(
+                package_name, latest, cuda_version, rocm_version
+            )
             return ResolvedPackage(
                 name=package_name,
                 version=latest,
-                cuda_variant=cuda_variant,
+                cuda_variant=gpu_variant,
             )
 
         # Package not in matrix — use spec as-is with a warning
@@ -217,6 +255,7 @@ class CompatibilityResolver:
         version: str,
         python_version: str,
         cuda_version: str | None,
+        rocm_version: str | None,
     ) -> ResolvedPackage:
         """Validate an exact version against the matrix and return a ResolvedPackage."""
         entry = get_framework_entry(package_name, version)
@@ -257,11 +296,30 @@ class CompatibilityResolver:
                     docs_url="https://pytorch.org/get-started/locally/",
                 )
 
-        cuda_variant = self._resolve_cuda_variant(package_name, version, cuda_version)
+        # Validate ROCm compatibility
+        if rocm_version is not None and entry.supported_rocm:
+            if rocm_version not in entry.supported_rocm:
+                raise IncompatibilityError(
+                    component="rocm",
+                    constraint=(
+                        f"{package_name} {version} supports ROCm: "
+                        f"{', '.join(entry.supported_rocm)}"
+                    ),
+                    detected=f"ROCm {rocm_version}",
+                    suggestion=(
+                        f"Use ROCm {entry.supported_rocm[-1]} or select a "
+                        f"different {package_name} version."
+                    ),
+                    docs_url="https://pytorch.org/get-started/locally/",
+                )
+
+        gpu_variant = self._resolve_gpu_variant(
+            package_name, version, cuda_version, rocm_version
+        )
         return ResolvedPackage(
             name=package_name,
             version=version,
-            cuda_variant=cuda_variant,
+            cuda_variant=gpu_variant,
         )
 
     def _resolve_with_override(
@@ -270,6 +328,7 @@ class CompatibilityResolver:
         override_version: str,
         python_version: str,
         cuda_version: str | None,
+        rocm_version: str | None = None,
     ) -> ResolvedPackage:
         """Validate and apply a user-specified version override."""
         return self._resolve_exact_version(
@@ -277,21 +336,29 @@ class CompatibilityResolver:
             version=override_version,
             python_version=python_version,
             cuda_version=cuda_version,
+            rocm_version=rocm_version,
         )
 
     @staticmethod
-    def _resolve_cuda_variant(
+    def _resolve_gpu_variant(
         package_name: str,
         version: str,
         cuda_version: str | None,
+        rocm_version: str | None,
     ) -> str | None:
         """
-        Determine the pip install cuda variant suffix for a package.
-        e.g., torch 2.1.0 with CUDA 11.8 → cuda_variant = "cu118"
+        Determine the pip install variant suffix for a package.
+        e.g., torch 2.1.0 with CUDA 11.8 → variant = "cu118"
+              torch 2.1.0 with ROCm 5.6 → variant = "rocm5.6"
         """
-        if cuda_version is None:
-            return None
-        if package_name not in ("torch", "torchvision", "torchaudio"):
-            return None
-        # Convert "11.8" → "cu118", "12.1" → "cu121"
-        return "cu" + cuda_version.replace(".", "")
+        if cuda_version is not None:
+            if package_name not in ("torch", "torchvision", "torchaudio"):
+                return None
+            return "cu" + cuda_version.replace(".", "")
+
+        if rocm_version is not None:
+            if package_name not in ("torch", "torchvision", "torchaudio"):
+                return None
+            return "rocm" + rocm_version
+
+        return None

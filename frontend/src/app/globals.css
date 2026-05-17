@@ -1,4 +1,8 @@
-:root {
+/* ─────────────────────────────────────────────────────────────
+   DARK MODE (Default)
+   ───────────────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   /* Color Palette - Premium Dark/Neon Theme */
   --bg-primary: #0a0a0c;
   --bg-secondary: #121216;
@@ -32,6 +36,43 @@
   --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   LIGHT MODE
+   ───────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  /* Color Palette - Clean Light Theme */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #ebebeb;
+  
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  
+  --brand-primary: #6366f1; /* Indigo - unchanged */
+  --brand-primary-hover: #4f46e5;
+  --brand-secondary: #ec4899; /* Pink - unchanged */
+  --brand-accent: #10b981; /* Emerald - unchanged */
+  
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Shadows & Elevations */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+  
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -47,22 +88,41 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
 /* Glassmorphism Utilities */
 .glass-panel {
-  background: rgba(18, 18, 22, 0.6);
+  background: var(--bg-secondary);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
+  transition: background-color var(--transition-normal), border-color var(--transition-normal);
+}
+
+[data-theme="dark"] .glass-panel {
+  background: rgba(18, 18, 22, 0.6);
+}
+
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .glass-nav {
-  background: rgba(10, 10, 12, 0.8);
+  background: var(--bg-primary);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--transition-normal), border-color var(--transition-normal);
+}
+
+[data-theme="dark"] .glass-nav {
+  background: rgba(10, 10, 12, 0.8);
+}
+
+[data-theme="light"] .glass-nav {
+  background: rgba(255, 255, 255, 0.8);
 }
 
 /* Typography Utilities */
@@ -115,10 +175,16 @@ a:hover {
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
 }
 
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-secondary {
   background-color: transparent;
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
+  transition: all var(--transition-fast);
 }
 
 .btn-secondary:hover {
@@ -132,4 +198,40 @@ a:hover {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   THEME TOGGLE BUTTON (Navbar)
+   ───────────────────────────────────────────────────────────── */
+.theme-toggle-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.theme-toggle-navbar:hover {
+  background-color: var(--brand-primary);
+  color: white;
+  border-color: var(--brand-primary);
+  transform: scale(1.05);
+}
+
+.theme-toggle-navbar:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 640px) {
+  .theme-toggle-navbar {
+    width: 36px;
+    height: 36px;
+  }
 }

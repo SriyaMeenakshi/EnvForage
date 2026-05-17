@@ -48,6 +48,22 @@ CUDA Version → {
 }
 ```
 
+### ROCm Compatibility Matrix (NEW)
+
+This matrix encodes: for a given ROCm version, what is the minimum required
+Linux kernel/driver version and supported GCN architectures.
+
+```
+ROCm Version → {
+    min_driver_linux: str,
+    supported_gpus: list[str],
+    supported_frameworks: {
+        "torch": ["2.0.x", "2.1.x"],
+        "tensorflow": ["2.13.x"]
+    }
+}
+```
+
 ### Example Matrix (Partial, for documentation)
 
 | CUDA | Min Driver | PyTorch | TensorFlow | cuDNN |
@@ -83,8 +99,8 @@ Framework Version → {
 ```
 function resolve(profile, constraints):
 
-  1. Load CUDA matrix for requested cuda_version
-     → If cuda_version not found: raise IncompatibilityError
+  1. Load CUDA matrix for requested cuda_version OR ROCm matrix for rocm_version
+     → If version not found: raise UnknownVersionError
 
   2. Validate driver_version >= matrix[cuda_version].min_driver
      → If fails: raise IncompatibilityError with required driver
@@ -145,6 +161,7 @@ backend/
         ├── resolver.py          # CompatibilityResolver class
         ├── matrix/
         │   ├── cuda.py          # CUDA ↔ driver ↔ framework matrix
+        │   ├── rocm.py          # ROCm ↔ driver ↔ framework matrix
         │   ├── python.py        # Python ↔ framework matrix
         │   └── os_rules.py      # OS-specific constraints
         ├── errors.py            # IncompatibilityError + subtypes
@@ -193,6 +210,6 @@ No test may use mocks for the matrix data itself — matrix data is the ground t
 ## Future Improvements
 
 - Conda environment resolution (Phase 6+)
-- ROCm (AMD) support
+- ROCm (AMD) support (Implemented in v0.1.1)
 - ONNX Runtime compatibility
 - Automatic matrix update from official release feeds (RSS/PyPI)

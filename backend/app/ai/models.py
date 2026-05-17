@@ -35,6 +35,9 @@ class TroubleshootRequest(BaseModel):
         "", description="Free-text description of the issue from the user.",
         max_length=500,
     )
+    session_id: str | None = Field(
+        None, description="Optional previous session ID to continue a conversation."
+    )
 
 
 # ── Response Models ───────────────────────────────────────────────────────────

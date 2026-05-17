@@ -12,8 +12,9 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, AsyncIterator
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.models import (
@@ -73,7 +74,11 @@ class AITroubleshootService:
         input_hash = self._hash_input(request)
 
         # ── Step 1: Build prompt ──────────────────────────────────────────
-        user_message = self._prompt_builder.build(request)
+        history = None
+        if request.session_id:
+            history = await self._fetch_session_history(db, request.session_id)
+            
+        user_message = self._prompt_builder.build(request, history=history)
         logger.info("Troubleshoot prompt built (%d chars)", len(user_message))
 
         # ── Step 2: Call LLM ──────────────────────────────────────────────
@@ -148,6 +153,52 @@ class AITroubleshootService:
         )
 
         return llm_result
+
+    async def stream_troubleshoot(
+        self,
+        request: TroubleshootRequest,
+        db: AsyncSession,
+    ) -> AsyncIterator[str]:
+        """
+        Stream the AI troubleshooting response.
+        
+        This method skips database persistence for individual tokens to
+        minimize latency, but still builds the full prompt and uses the
+        configured LLM provider in streaming mode.
+        """
+        history = None
+        if request.session_id:
+            history = await self._fetch_session_history(db, request.session_id)
+
+        user_message = self._prompt_builder.build(request, history=history)
+        provider = get_provider()
+        
+        logger.info("Starting troubleshoot stream (provider=%s)", type(provider).__name__)
+        
+        async for chunk in provider.stream(
+            system_prompt=TROUBLESHOOT_SYSTEM_PROMPT,
+            user_message=user_message,
+            response_model=TroubleshootResponse,
+        ):
+            yield chunk
+
+    async def _fetch_session_history(
+        self,
+        db: AsyncSession,
+        session_id: str,
+    ) -> list[AISuggestion]:
+        """Fetch previous AI suggestions for a given session ID."""
+        try:
+            stmt = (
+                select(AISuggestion)
+                .where(AISuggestion.session_id == uuid.UUID(session_id))
+                .order_by(AISuggestion.step_number.asc())
+            )
+            result = await db.execute(stmt)
+            return list(result.scalars().all())
+        except Exception as exc:
+            logger.error("Failed to fetch session history for %s: %s", session_id, exc)
+            return []
 
     # ── Private helpers ───────────────────────────────────────────────────
 

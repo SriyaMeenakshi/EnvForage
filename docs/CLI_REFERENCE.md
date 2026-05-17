@@ -15,7 +15,7 @@ pip install envforge-agent
 
 ## 1. `envforge diagnose`
 
-Scans your local environment (OS, CPU, RAM, GPU, CUDA, cuDNN, Python) and generates a structured `DiagnosticReport`.
+Scans your local environment (OS, CPU, RAM, GPU, CUDA, ROCm, cuDNN, Python) and generates a structured `DiagnosticReport`.
 
 ### Usage
 ```bash

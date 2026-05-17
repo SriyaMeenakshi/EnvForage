@@ -65,7 +65,13 @@ def cli() -> None:
     "--quiet", "-q", is_flag=True, default=False,
     help="Suppress all output except the JSON report.",
 )
-def diagnose(output: str | None, send: bool, api_url: str, quiet: bool) -> None:
+
+@click.option(
+    "--sarif", is_flag=True, default=False,
+    help="Output diagnostics in SARIF 2.1.0 format for CI/CD pipeline integrations.",
+)
+
+def diagnose(output: str | None, send: bool, api_url: str, quiet: bool, sarif: bool) -> None:
     """
     Collect a full diagnostic report of this machine's ML environment.
 
@@ -84,6 +90,12 @@ def diagnose(output: str | None, send: bool, api_url: str, quiet: bool) -> None:
     if not quiet:
         _print_report_summary(report)
 
+# ── SARIF output ────────────────────────────────────────────────────────
+    if sarif:
+        import json as _json
+        click.echo(_json.dumps(report.to_sarif(), indent=2))
+        return
+    
     report_json = report.to_json(indent=2)
 
     # ── Output to file ──────────────────────────────────────────────────────
@@ -128,6 +140,12 @@ def _print_report_summary(report: DiagnosticReport) -> None:
             table.add_row("CUDA Path", report.cuda.toolkit_path)
     else:
         table.add_row("CUDA", "[dim]Not detected[/]")
+
+    if report.rocm.version:
+        gcn = f" (GCN {report.rocm.gcn_arch})" if report.rocm.gcn_arch else ""
+        table.add_row("ROCm", f"{report.rocm.version}{gcn}")
+    else:
+        table.add_row("ROCm", "[dim]Not detected[/]")
 
     if report.active_python:
         py = report.active_python

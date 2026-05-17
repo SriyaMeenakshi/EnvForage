@@ -28,6 +28,12 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://envforge:envforge_dev_secret@localhost:5432/envforge"
     )
 
+    # ── Redis ─────────────────────────────────────────────────
+    # If set, the rate limiter will use Redis instead of in-memory storage.
+    # Required in production for multi-worker correctness.
+    # Format: redis://:password@host:port/db  or  redis://host:port/db
+    redis_url: str | None = None
+
     # ── CORS ─────────────────────────────────────────────────
     allowed_origins: str = "http://localhost:3000"
 
@@ -54,6 +60,8 @@ class Settings(BaseSettings):
     rate_limit_ai_rpm: int = 10       # AI troubleshoot: requests per minute
     rate_limit_repair_rpm: int = 20   # Repair endpoint: requests per minute
     rate_limit_general_rpm: int = 60  # General API: requests per minute
+    
+    redis_url: str | None = None
 
 
 @lru_cache

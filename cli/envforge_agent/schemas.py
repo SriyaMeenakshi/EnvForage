@@ -17,16 +17,16 @@ from pydantic import BaseModel, Field
 
 
 class OSInfo(BaseModel):
-    name: str                        # e.g. "Windows 11", "Ubuntu 22.04"
-    version: str                     # e.g. "22.04", "10.0.22631"
-    architecture: str                # e.g. "x86_64", "AMD64"
-    wsl_version: str | None = None   # e.g. "WSL2", None if not WSL
+    name: str
+    version: str
+    architecture: str
+    wsl_version: str | None = None
 
 
 class CPUInfo(BaseModel):
-    brand: str                       # e.g. "Intel Core i9-13900K"
-    cores: int                       # Physical cores
-    threads: int                     # Logical threads (with HT)
+    brand: str
+    cores: int
+    threads: int
 
 
 class RAMInfo(BaseModel):
@@ -35,25 +35,30 @@ class RAMInfo(BaseModel):
 
 
 class GPUInfo(BaseModel):
-    name: str                        # e.g. "NVIDIA RTX 4090"
-    vram_gb: float | None = None     # VRAM in GB
+    name: str
+    vram_gb: float | None = None
     driver_version: str | None = None
-    index: int = 0                   # 0-based GPU index (multi-GPU systems)
+    index: int = 0
 
 
 class CUDAInfo(BaseModel):
-    version: str | None = None       # e.g. "12.1"
-    toolkit_path: str | None = None  # e.g. "/usr/local/cuda-12.1"
-    cudnn_version: str | None = None # e.g. "8.9.0"
+    version: str | None = None
+    toolkit_path: str | None = None
+    cudnn_version: str | None = None
     nccl_version: str | None = None
 
 
+class ROCMInfo(BaseModel):
+    version: str | None = None       # e.g. "5.6"
+    gcn_arch: str | None = None      # e.g. "gfx1030"
+
+
 class PythonInfo(BaseModel):
-    version: str                     # e.g. "3.11.9"
-    path: str                        # Absolute path to python executable
+    version: str
+    path: str
     is_venv: bool = False
-    venv_path: str | None = None     # Path to venv root if is_venv
-    pip_version: str | None = None   # e.g. "24.0"
+    venv_path: str | None = None
+    pip_version: str | None = None
 
 
 class DiagnosticReport(BaseModel):
@@ -69,9 +74,69 @@ class DiagnosticReport(BaseModel):
     ram: RAMInfo
     gpus: list[GPUInfo] = Field(default_factory=list)
     cuda: CUDAInfo = Field(default_factory=CUDAInfo)
+    rocm: ROCMInfo = Field(default_factory=ROCMInfo)
     python_installations: list[PythonInfo] = Field(default_factory=list)
     active_python: PythonInfo | None = None
 
     def to_json(self, indent: int = 2) -> str:
         """Serialize to JSON string (API-compatible)."""
         return self.model_dump_json(indent=indent)
+
+    def to_sarif(self) -> dict:
+        """Serialize diagnostic report to SARIF 2.1.0 format for CI/CD pipelines."""
+        results = []
+
+        # GPU check
+        if not self.gpus:
+            results.append({
+                "ruleId": "ENV001",
+                "level": "warning",
+                "message": {"text": "No NVIDIA GPU detected on this system."},
+                "locations": [{"physicalLocation": {"artifactLocation": {"uri": "system/gpu"}}}],
+            })
+
+        # CUDA check
+        if not self.cuda.version:
+            results.append({
+                "ruleId": "ENV002",
+                "level": "warning",
+                "message": {"text": "CUDA is not detected on this system."},
+                "locations": [{"physicalLocation": {"artifactLocation": {"uri": "system/cuda"}}}],
+            })
+
+        # Python check
+        if not self.active_python:
+            results.append({
+                "ruleId": "ENV003",
+                "level": "error",
+                "message": {"text": "No active Python installation detected."},
+                "locations": [{"physicalLocation": {"artifactLocation": {"uri": "system/python"}}}],
+            })
+
+        return {
+            "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {
+                        "driver": {
+                            "name": "envforge-agent",
+                            "version": self.agent_version,
+                            "rules": [
+                                {"id": "ENV001", "name": "NoGPU", "shortDescription": {"text": "No GPU detected"}},
+                                {"id": "ENV002", "name": "NoCUDA", "shortDescription": {"text": "CUDA not detected"}},
+                                {"id": "ENV003", "name": "NoPython", "shortDescription": {"text": "No Python detected"}},
+                            ],
+                        }
+                    },
+                    "results": results,
+                    "properties": {
+                        "os": f"{self.os.name} {self.os.version}",
+                        "cpu": self.cpu.brand,
+                        "ram_gb": self.ram.total_gb,
+                        "python": self.active_python.version if self.active_python else None,
+                        "cuda": self.cuda.version,
+                    },
+                }
+            ],
+        }

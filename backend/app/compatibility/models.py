@@ -33,6 +33,7 @@ class ResolvedEnvironment:
     python_version: str                           # e.g. "3.11"
     cuda_version: str | None                      # e.g. "12.1", None for CPU
     target_os: OSTarget
+    rocm_version: str | None = None               # e.g. "5.6", None for CPU/CUDA
     packages: list[ResolvedPackage] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -40,6 +41,7 @@ class ResolvedEnvironment:
         return {
             "python_version": self.python_version,
             "cuda_version": self.cuda_version,
+            "rocm_version": self.rocm_version,
             "target_os": self.target_os,
             "packages": [
                 {
@@ -69,6 +71,19 @@ class CUDAMatrixEntry:
 
 
 @dataclass(frozen=True)
+class ROCMMatrixEntry:
+    """
+    Compatibility data for a specific ROCm version.
+    Sourced from AMD official documentation.
+    """
+    rocm_version: str
+    min_driver_linux: str
+    supported_gpus: list[str]
+    notes: str = ""
+    source_url: str = ""
+
+
+@dataclass(frozen=True)
 class FrameworkVersionEntry:
     """
     Python compatibility data for a specific framework version.
@@ -77,5 +92,6 @@ class FrameworkVersionEntry:
     version: str
     min_python: str
     max_python: str
-    supported_cuda: list[str]
-    supported_python: list[str]
+    supported_cuda: list[str] = field(default_factory=list)
+    supported_rocm: list[str] = field(default_factory=list)
+    supported_python: list[str] = field(default_factory=list)

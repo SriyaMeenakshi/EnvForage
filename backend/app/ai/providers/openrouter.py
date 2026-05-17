@@ -1,7 +1,6 @@
-"""OpenRouter LLM provider — routes requests to any model via OpenRouter API."""
 import json
 import logging
-from typing import TypeVar
+from typing import AsyncIterator, TypeVar
 
 import httpx
 from pydantic import BaseModel
@@ -203,3 +202,73 @@ class OpenRouterProvider(LLMProvider):
 
         # All retries exhausted
         raise last_error or LLMProviderError("openrouter", "All retries exhausted.")
+
+    async def stream(
+        self,
+        system_prompt: str,
+        user_message: str,
+        response_model: type[T],
+    ) -> AsyncIterator[str]:
+        """
+        Send a completion request to OpenRouter and stream the response content.
+        Useful for providing real-time feedback to the user.
+        """
+        schema_json = json.dumps(response_model.model_json_schema(), indent=2)
+        enhanced_system = (
+            f"{system_prompt}\n\n"
+            f"You MUST respond with ONLY valid JSON matching this exact schema:\n"
+            f"```json\n{schema_json}\n```\n"
+            f"Do NOT include any text outside the JSON object."
+        )
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": enhanced_system},
+                {"role": "user", "content": user_message},
+            ],
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+            "stream": True,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://envforge.dev",
+            "X-Title": "EnvForge AI Troubleshooter",
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
+                "POST",
+                OPENROUTER_API_URL,
+                json=payload,
+                headers=headers,
+            ) as response:
+                if response.status_code != 200:
+                    error_body = await response.aread()
+                    raise LLMProviderError(
+                        "openrouter",
+                        f"HTTP {response.status_code}: {error_body[:500]}",
+                    )
+
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+
+                    data_str = line[6:].strip()
+                    if data_str == "[DONE]":
+                        break
+
+                    try:
+                        data = json.loads(data_str)
+                        choices = data.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue

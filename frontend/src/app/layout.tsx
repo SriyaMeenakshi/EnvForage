@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider, ThemeToggle } from "./providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable}`}>
+        <ThemeProvider>
         {/* Navigation Bar */}
         <nav className="glass-nav" style={{ position: 'sticky', top: 0, zIndex: 50, padding: '1rem 0' }}>
           <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -32,7 +34,8 @@ export default function RootLayout({
                 <a href="/troubleshoot">AI Troubleshoot</a>
               </div>
             </div>
-            <div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <ThemeToggle />
               <a href="https://github.com/rishabh0510rishabh/EnvForage" target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>
                 GitHub
               </a>
@@ -55,6 +58,7 @@ export default function RootLayout({
             </div>
           </div>
         </footer>
+        </ThemeProvider>
       </body>
     </html>
   );

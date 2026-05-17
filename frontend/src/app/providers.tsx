@@ -1,0 +1,84 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState } from "react";
+import { Sun, Moon } from "lucide-react";
+
+// Create a context to share theme state across components
+const ThemeContext = createContext<{
+  theme: "dark" | "light" | "system";
+  toggleTheme: () => void;
+  mounted: boolean;
+} | null>(null);
+
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useTheme must be used within ThemeProvider");
+  }
+  return context;
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<"dark" | "light" | "system">("dark");
+  const [mounted, setMounted] = useState(false);
+
+  // Initialize theme from localStorage on mount
+  useEffect(() => {
+    setMounted(true);
+    const storedTheme = localStorage.getItem("theme") as "dark" | "light" | "system" | null;
+    if (storedTheme) {
+      setTheme(storedTheme);
+      applyTheme(storedTheme);
+    } else {
+      // Default to dark mode
+      applyTheme("dark");
+    }
+  }, []);
+
+  const applyTheme = (newTheme: "dark" | "light" | "system") => {
+    const htmlElement = document.documentElement;
+    
+    if (newTheme === "dark") {
+      htmlElement.setAttribute("data-theme", "dark");
+    } else if (newTheme === "light") {
+      htmlElement.setAttribute("data-theme", "light");
+    } else {
+      // System mode
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      htmlElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
+    }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    applyTheme(newTheme);
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function ThemeToggle() {
+  const { theme, toggleTheme, mounted } = useTheme();
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={toggleTheme}
+      className="theme-toggle-navbar"
+      title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+    >
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+}

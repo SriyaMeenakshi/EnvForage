@@ -60,7 +60,10 @@ export const api = {
     return response.json();
   },
 
-  troubleshoot: async (request: TroubleshootRequest): Promise<TroubleshootResponse> => {
+  troubleshoot: async (
+    request: TroubleshootRequest,
+    onToken: (token: string) => void
+  ): Promise<TroubleshootResponse> => {
     const response = await fetch(`${API_BASE_URL}/troubleshoot`, {
       method: 'POST',
       headers: {
@@ -68,11 +71,43 @@ export const api = {
       },
       body: JSON.stringify(request),
     });
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail?.message || 'AI troubleshooting failed');
     }
-    return response.json();
+
+    if (!response.body) {
+      throw new Error('Response body is null');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const token = line.slice(6);
+          fullContent += token;
+          onToken(token);
+        }
+      }
+    }
+
+    // After stream completes, parse the full accumulated JSON
+    try {
+      return JSON.parse(fullContent) as TroubleshootResponse;
+    } catch (err) {
+      console.error('Failed to parse final AI response:', fullContent);
+      throw new Error('AI returned invalid JSON structure');
+    }
   },
 
   generateRepair: async (request: RepairRequest): Promise<RepairResponse> => {

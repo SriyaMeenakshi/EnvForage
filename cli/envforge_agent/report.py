@@ -8,13 +8,10 @@ Usage:
 """
 from __future__ import annotations
 
-from envforge_agent.detectors import (
-    detect_cpu,
-    detect_cuda,
-    detect_gpus,
     detect_os,
     detect_python,
     detect_ram,
+    detect_rocm,
 )
 from envforge_agent.schemas import DiagnosticReport
 
@@ -39,6 +36,7 @@ class ReportBuilder:
         ram_info = detect_ram()
         gpus = detect_gpus()
         cuda_info = detect_cuda()
+        rocm_info = detect_rocm()
         installations, active_python = detect_python()
 
         return DiagnosticReport(
@@ -47,6 +45,7 @@ class ReportBuilder:
             ram=ram_info,
             gpus=gpus,
             cuda=cuda_info,
+            rocm=rocm_info,
             python_installations=installations,
             active_python=active_python,
         )

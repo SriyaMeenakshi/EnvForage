@@ -46,6 +46,7 @@ PYTHON_MATRIX: dict[str, list[FrameworkVersionEntry]] = {
             min_python="3.8", max_python="3.11",
             supported_python=["3.8", "3.9", "3.10", "3.11"],
             supported_cuda=["11.8", "12.1"],
+            supported_rocm=["5.4.2", "5.6.0"],
         ),
         FrameworkVersionEntry(
             framework="torch", version="2.2.0",
@@ -76,6 +77,7 @@ PYTHON_MATRIX: dict[str, list[FrameworkVersionEntry]] = {
             min_python="3.8", max_python="3.12",
             supported_python=["3.8", "3.9", "3.10", "3.11", "3.12"],
             supported_cuda=["11.8", "12.1", "12.4"],
+            supported_rocm=["6.0.0"],
         ),
     ],
     "tensorflow": [
@@ -140,16 +142,19 @@ def get_latest_compatible_version(
     framework: str,
     python_version: str,
     cuda_version: str | None = None,
+    rocm_version: str | None = None,
 ) -> str | None:
     """
     Return the latest framework version compatible with the given
-    Python and CUDA versions. Returns None if no compatible version found.
+    Python, CUDA, and ROCm versions. Returns None if no compatible version found.
     """
     candidates = []
     for entry in PYTHON_MATRIX.get(framework, []):
         if python_version not in entry.supported_python:
             continue
         if cuda_version is not None and cuda_version not in entry.supported_cuda:
+            continue
+        if rocm_version is not None and rocm_version not in entry.supported_rocm:
             continue
         candidates.append(entry.version)
 

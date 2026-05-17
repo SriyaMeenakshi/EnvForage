@@ -19,6 +19,7 @@ class DiagnosticReport(Base):
     os_type: Mapped[str | None] = mapped_column(String(16))
     gpu_name: Mapped[str | None] = mapped_column(String(128))
     cuda_version: Mapped[str | None] = mapped_column(String(16))
+    rocm_version: Mapped[str | None] = mapped_column(String(16))
     python_version: Mapped[str | None] = mapped_column(String(8))
     driver_version: Mapped[str | None] = mapped_column(String(32))
 
