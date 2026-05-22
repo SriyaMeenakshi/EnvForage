@@ -7,7 +7,15 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import compatibility, diagnose, profiles, repair, scripts, troubleshoot, verify
+from app.api.v1 import (
+    compatibility,
+    diagnose,
+    profiles,
+    repair,
+    scripts,
+    troubleshoot,
+    verify,
+)
 from app.config import get_settings
 
 

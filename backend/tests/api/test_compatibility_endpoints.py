@@ -3,6 +3,7 @@ Tests for GET /api/v1/compatibility/* endpoints.
 Issue #85 — Expose Compatibility Matrices via REST API.
 """
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)

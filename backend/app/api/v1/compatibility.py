@@ -4,18 +4,20 @@ Exposes CUDA, ROCm, and Python compatibility matrices as read-only REST endpoint
 Resolves Issue #85.
 """
 from dataclasses import asdict
+
 from fastapi import APIRouter, HTTPException
+
 from app.compatibility.matrix.cuda import (
     CUDA_MATRIX,
     FRAMEWORK_CUDA_SUPPORT,
     SUPPORTED_CUDA_VERSIONS,
 )
+from app.compatibility.matrix.python import PYTHON_MATRIX
 from app.compatibility.matrix.rocm import (
-    ROCM_MATRIX,
     FRAMEWORK_ROCM_SUPPORT,
+    ROCM_MATRIX,
     SUPPORTED_ROCM_VERSIONS,
 )
-from app.compatibility.matrix.python import PYTHON_MATRIX
 
 router = APIRouter(prefix="/compatibility")
 
