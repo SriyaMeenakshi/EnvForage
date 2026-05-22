@@ -4,6 +4,7 @@ Template Engine — renders Jinja2 templates into setup scripts.
 All rendered output passes through SafetyFilter before being returned.
 This module never executes generated code; it only renders text.
 """
+from collections.abc import Sequence
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -92,7 +93,7 @@ class TemplateRenderer:
 
     def render_all(
         self,
-        output_filenames: list[str],
+        output_filenames: Sequence[str],
         context: TemplateContext,
     ) -> list[RenderResult]:
         """Render multiple output formats from the same context."""

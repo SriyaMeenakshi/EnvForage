@@ -15,3 +15,15 @@ repos:
         files: ^backend/
         types_or: [python, pyi]
         exclude: ^backend/alembic/
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^backend/alembic/
+      - id: end-of-file-fixer
+        exclude: ^backend/alembic/
+      - id: check-yaml
+        exclude: ^backend/alembic/
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key

@@ -1,14 +1,20 @@
 """Profile endpoints — GET /api/v1/profiles and /api/v1/profiles/{slug}."""
-from fastapi import APIRouter, HTTPException, Query
+import logging
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.api.deps import DB
 from app.schemas.profile import (
+    ProfileCreateSchema,
     ProfileDetailSchema,
     ProfileFilters,
     ProfileListResponse,
     ProfileSummarySchema,
 )
 from app.services import profile_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,3 +63,44 @@ async def get_profile(slug: str, db: DB) -> ProfileDetailSchema:
             },
         )
     return ProfileDetailSchema.model_validate(profile)
+
+
+@router.post("/profiles", response_model=ProfileDetailSchema, status_code=status.HTTP_201_CREATED)
+async def create_profile(profile_in: ProfileCreateSchema, db: DB) -> ProfileDetailSchema:
+    """
+    Create a new environment profile.
+    """
+    try:
+        profile = await profile_service.create_profile(db, profile_in)
+        return ProfileDetailSchema.model_validate(profile)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A profile with this slug already exists."
+        )
+    except SQLAlchemyError as e:
+        await db.rollback()
+        logger.error("Database error while creating profile: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred while creating the profile."
+        )
+
+
+@router.delete("/profiles/{slug}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_profile(slug: str, db: DB) -> None:
+    """
+    Soft delete a profile by slug.
+    """
+    deleted = await profile_service.delete_profile(db, slug)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": {
+                    "code": "PROFILE_NOT_FOUND",
+                    "message": f"Profile '{slug}' not found",
+                }
+            },
+        )

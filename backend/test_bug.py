@@ -10,4 +10,5 @@ async def main():
             from app.schemas.profile import ProfileDetailSchema
             print(ProfileDetailSchema.model_validate(profile))
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

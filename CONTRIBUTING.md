@@ -25,7 +25,7 @@ Please read the [Code of Conduct](./CODE_OF_CONDUCT.md) to keep our community ap
    ```bash
    # Recommended: Install globally
    pipx install pre-commit
-   
+
    # From the repo root, install the hooks
    pre-commit install
    ```
@@ -54,8 +54,12 @@ EnvForge/
 To add a new ML environment profile (e.g., JAX, TensorRT):
 1. Review the [PROFILE_SPEC.md](./docs/PROFILE_SPEC.md) for the required schema.
 2. Add your profile to `backend/seeds/profiles.yaml`.
-3. Run the seed service (`python -m app.services.seed_service`) to test it locally.
-4. Update `docs/FEATURES.md`.
+3. Validate your profile using the validation script:
+   ```bash
+   python -m scripts.validate_profiles backend/seeds/profiles.yaml
+   ```
+4. Run the seed service (`python -m app.services.seed_service`) to test it locally.
+5. Update `docs/FEATURES.md`.
 
 ## How to Add Templates
 

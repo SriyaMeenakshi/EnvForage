@@ -35,11 +35,9 @@ def test_pyproject_template_renders_basic():
     )
     renderer = TemplateRenderer()
     result = renderer.render("pyproject.toml", context)
-    
     # Check headers
     assert "myenv" in result.content
     assert "3.10" in result.content
-    
     # Check TOML format
     assert '[project]' in result.content
     assert 'name = "envforge-generated"' in result.content

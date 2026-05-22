@@ -38,7 +38,7 @@ class TestDiagnosticReportSchema:
         """Every fixture must deserialize into a valid DiagnosticReport."""
         raw = (FIXTURES_DIR / fixture_file).read_text(encoding="utf-8")
         report = DiagnosticReport.model_validate_json(raw)
-        assert report.agent_version == "0.1.0"
+        assert report.agent_version == "1.0.0"
         assert report.os.name
         assert report.cpu.cores >= 1
         assert report.cpu.threads >= report.cpu.cores
@@ -88,7 +88,7 @@ class TestDiagnosticReportSchema:
         report = DiagnosticReport.model_validate(data)
         json_str = report.to_json()
         parsed = json.loads(json_str)
-        assert parsed["agent_version"] == "0.1.0"
+        assert parsed["agent_version"] == "1.0.0"
         assert "os" in parsed
         assert "gpus" in parsed
 
@@ -260,7 +260,7 @@ class TestReportBuilder:
         from envforge_agent.report import ReportBuilder
         report = ReportBuilder().build()
         assert isinstance(report, DiagnosticReport)
-        assert report.agent_version == "0.1.0"
+        assert report.agent_version == "1.0.0"
         assert report.os.name
         assert report.cpu.cores >= 1
 

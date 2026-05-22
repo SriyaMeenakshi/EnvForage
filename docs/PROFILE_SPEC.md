@@ -58,4 +58,8 @@ The `packages` list defines the dependencies to install.
 
 1. Add your YAML block to `backend/seeds/profiles.yaml`.
 2. Ensure the combination of Framework + CUDA + Python versions exists in the Compatibility Matrix (`backend/seeds/cuda_matrix.yaml` or `app/compatibility/matrix/`).
-3. Run `python -m app.services.seed_service` to ingest the new profile into your local dev database.
+3. Run the profile validation script to check for schema and logical errors:
+   ```bash
+   python -m scripts.validate_profiles backend/seeds/profiles.yaml
+   ```
+4. Run `python -m app.services.seed_service` to ingest the new profile into your local dev database.

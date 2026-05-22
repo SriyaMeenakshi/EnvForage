@@ -18,6 +18,19 @@ class PackageSpecSchema(BaseModel):
 
 # ── Profile schemas ────────────────────────────────────────────────────────────
 
+class ProfileCreateSchema(BaseModel):
+    """Schema for creating a new profile."""
+    slug: str = Field(..., max_length=64)
+    name: str = Field(..., max_length=128)
+    description: str | None = None
+    tags: list[str] | None = None
+    os_support: list[str]
+    cuda_required: bool = False
+    python_versions: list[str]
+    cuda_versions: list[str] | None = None
+    packages: list[PackageSpecSchema] = Field(default_factory=list)
+
+
 class ProfileSummarySchema(BaseModel):
     """Lightweight profile for list responses."""
     id: uuid.UUID

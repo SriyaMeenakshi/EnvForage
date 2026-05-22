@@ -1,18 +1,21 @@
 """Alembic environment script for async SQLAlchemy."""
+
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from dotenv import load_dotenv
+
+import app.models  # noqa: F401 — ensure all models are registered
+from alembic import context
+from app.database import Base
 
 load_dotenv()
 
 # Import all models so Alembic can detect schema
-from app.database import Base
-import app.models  # noqa: F401 — ensure all models are registered
+
 
 config = context.config
 if config.config_file_name is not None:

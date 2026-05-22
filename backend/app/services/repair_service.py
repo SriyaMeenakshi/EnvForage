@@ -78,7 +78,7 @@ class RepairService:
         self,
         template_id: str,
         params: dict[str, Any] | None = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         """
         Render a repair script from a template ID and parameters.
 

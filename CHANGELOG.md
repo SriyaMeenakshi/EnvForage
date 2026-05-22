@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-21
+
+### Added
+- **v1.0.0 Stable Release.**
+  - Official launch of the stable `v1.0.0` release of the EnvForge platform, consolidating all CLI, backend, frontend, and AI troubleshooting features.
+  - End-to-end integration of AI-assisted environment troubleshooting, system diagnostic reporting, and custom shell setup script generation.
+
+### Fixed
+- **Frontend Build & Compilation Stability:**
+  - Resolved all compilation, type, and linting errors across the Next.js frontend application.
+  - Fixed TypeScript compiler errors in `generate/page.tsx` related to `cuda_versions` and `python_versions` arrays possibly being undefined.
+  - Resolved ESLint unused variable warnings in `api.ts`, `troubleshoot/page.tsx`, and `diagnose/page.tsx`.
+  - Moved nested components in `troubleshoot/page.tsx` to the file-level scope to satisfy React 19/Next.js 16 rules.
+  - Fixed Next.js client hydration and theme synchronization warnings in `providers.tsx` by declaring `applyTheme` before utilization and configuring appropriate suppression.
+  - Replaced native `<a>` elements with Next.js client-side `<Link>` tags across the layout.
+
 ## [0.5.0] - 2026-05-16
 
 ### Added
