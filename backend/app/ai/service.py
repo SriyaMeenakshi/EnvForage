@@ -195,10 +195,10 @@ class AITroubleshootService:
             )
             result = await db.execute(stmt)
             return list(result.scalars().all())
-        
+
         except OperationalError as exc:
             logger.critical(
-                "Critical database connectivity failure for session %s: %s", 
+                "Critical database connectivity failure for session %s: %s",
                 session_id, exc
             )
             raise HTTPException(
@@ -207,7 +207,7 @@ class AITroubleshootService:
             )
         except SQLAlchemyError as exc:
             logger.error(
-                "Transient database error fetching session history for %s: %s", 
+                "Transient database error fetching session history for %s: %s",
                 session_id, exc
             )
             return []
