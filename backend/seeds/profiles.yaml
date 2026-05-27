@@ -45,7 +45,7 @@ profiles:
     python_versions: ["3.10", "3.11"]
     cuda_versions: ["11.8"]
     status: ACTIVE
-    last_validated: "2024-12-01"
+    last_validated: "2026-05-24"
     packages:
       - name: tensorflow
         version_spec: "2.14.0"
@@ -71,7 +71,7 @@ profiles:
     python_versions: ["3.10", "3.11"]
     cuda_versions: ["11.8", "12.1"]
     status: ACTIVE
-    last_validated: "2024-12-01"
+    last_validated: "2026-05-24"
     packages:
       - name: ultralytics
         version_spec: "8.2.0"
@@ -101,7 +101,7 @@ profiles:
     python_versions: ["3.10", "3.11"]
     cuda_versions: ["11.8", "12.1"]
     status: ACTIVE
-    last_validated: "2024-12-01"
+    last_validated: "2026-05-24"
     packages:
       - name: torch
         version_spec: "2.1.2"
@@ -137,7 +137,7 @@ profiles:
     python_versions: ["3.9", "3.10", "3.11"]
     cuda_versions: []
     status: ACTIVE
-    last_validated: "2024-12-01"
+    last_validated: "2026-05-24"
     packages:
       - name: opencv-python
         version_spec: "4.9.0.80"
@@ -167,7 +167,7 @@ profiles:
     python_versions: ["3.10", "3.11"]
     cuda_versions: ["11.8", "12.1"]
     status: ACTIVE
-    last_validated: "2024-12-01"
+    last_validated: "2026-05-24"
     packages:
       - name: torch
         version_spec: "2.1.2"
@@ -253,8 +253,7 @@ profiles:
         version_spec: "10.0.1"
         install_order: 0                  # FIX: removed cuda_variant (not torch, resolver ignores it)
       - name: torch
-        version_spec: "2.1.2"
-        cuda_variant: "cu121"             # KEEP: torch IS in the resolver matrix
+        version_spec: "2.1.2"            
         install_order: 1
       - name: onnx
         version_spec: "1.16.0"
@@ -271,7 +270,7 @@ profiles:
       - name: Pillow
         version_spec: "10.3.0"
         install_order: 6
-=======
+
   - slug: langchain-rag
     name: "LangChain RAG"
     description: >
@@ -297,4 +296,3 @@ profiles:
       - name: sentence-transformers
         version_spec: "2.7.0"
         install_order: 3
-
