@@ -222,14 +222,31 @@ def _detect_cudnn(toolkit_path: str | None) -> str | None:
 def _parse_cudnn_header(header_path: Path) -> str | None:
     """Extract major.minor.patch from a cuDNN header file."""
     try:
-        content = header_path.read_text(encoding="utf-8", errors="ignore")
-        major = re.search(r"#define\s+CUDNN_MAJOR\s+(\d+)", content)
-        minor = re.search(r"#define\s+CUDNN_MINOR\s+(\d+)", content)
-        patch = re.search(r"#define\s+CUDNN_PATCHLEVEL\s+(\d+)", content)
-        if major and minor and patch:
-            return f"{major.group(1)}.{minor.group(1)}.{patch.group(1)}"
-    except (FileNotFoundError, PermissionError):
-        pass
+        major, minor, patch = None, None, None
+
+        with header_path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if major is None:
+                    match = re.search(r"#define\s+CUDNN_MAJOR\s+(\d+)", line)
+                    if match:
+                        major = match.group(1)
+
+                if minor is None:
+                    match = re.search(r"#define\s+CUDNN_MINOR\s+(\d+)", line)
+                    if match:
+                        minor = match.group(1)
+
+                if patch is None:
+                    match = re.search(r"#define\s+CUDNN_PATCHLEVEL\s+(\d+)", line)
+                    if match:
+                        patch = match.group(1)
+
+                if major and minor and patch:
+                    return f"{major}.{minor}.{patch}"
+
+    except (FileNotFoundError, PermissionError, OSError):
+        return None
+
     return None
 
 

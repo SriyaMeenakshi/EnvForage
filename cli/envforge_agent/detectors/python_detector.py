@@ -15,7 +15,6 @@ Strategy:
 from __future__ import annotations
 
 import json
-import os
 import platform
 import subprocess
 import sys
@@ -131,6 +130,7 @@ def _inspect_python(binary: str) -> PythonInfo | None:
     Run the inspector script inside the given Python binary.
     Returns None if the binary is not found or fails.
     """
+    process = None
     try:
         # Handle "py -3.11" style on Windows
         if binary.startswith("py -"):
@@ -138,16 +138,31 @@ def _inspect_python(binary: str) -> PythonInfo | None:
         else:
             args = [binary, "-c", _INSPECTOR]
 
-        result = subprocess.run(
+        process = subprocess.Popen(
             args,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=10,
         )
-        if result.returncode != 0 or not result.stdout.strip():
+        try:
+            stdout, stderr = process.communicate(timeout=10)
+        except subprocess.TimeoutExpired as exc:
+            try:
+                psutil = __import__("psutil")
+                parent = psutil.Process(process.pid)
+                for child in parent.children(recursive=True):
+                    child.kill()
+            except Exception:
+                pass
+            process.kill()
+            process.communicate()
+            setattr(exc, "process", process)
+            raise exc
+
+        if process.returncode != 0 or not stdout.strip():
             return None
 
-        data = json.loads(result.stdout.strip())
+        data = json.loads(stdout.strip())
         return PythonInfo(
             version=data["version"],
             path=data["path"],

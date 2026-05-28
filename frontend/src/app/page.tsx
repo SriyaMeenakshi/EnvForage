@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Zap, Shield, Brain, Cpu } from "lucide-react";
+import { Zap, Shield, Brain, Cpu } from "lucide-react";
 
 export default function HomePage() {
   const features = [

@@ -243,13 +243,6 @@ def _make_backend() -> RateLimitBackend:
 
 _backend = _make_backend()
 
-settings = get_settings()
-
-if settings.redis_url:
-    _backend = RedisBackend(settings.redis_url)
-else:
-    _backend = InMemoryBackend()
-
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
 

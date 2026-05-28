@@ -6,6 +6,7 @@ import { UploadCloud, CheckCircle, AlertTriangle, ShieldAlert, Cpu, HardDrive, M
 import { DiagnosticReport, DiagnosticResponse, Profile } from "../../types";
 import { api } from "../../services/api";
 import Link from "next/link";
+import TerminalLoader from "../../components/TerminalLoader";
 
 export default function DiagnosePage() {
   const [jsonInput, setJsonInput] = useState("");
@@ -15,6 +16,7 @@ export default function DiagnosePage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [verifying, setVerifying] = useState(false);
+  const [apiDone, setApiDone] = useState(false);
   const [verifyResult, setVerifyResult] = useState<DiagnosticResponse | null>(null);
 
   useEffect(() => {
@@ -45,14 +47,16 @@ export default function DiagnosePage() {
   const handleVerify = async () => {
     if (!report || !selectedProfile) return;
     setVerifying(true);
+    setApiDone(false);
+    setError(null);
     setVerifyResult(null);
     try {
       const result = await api.diagnose(report, selectedProfile);
       setVerifyResult(result);
+      setApiDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed.");
-    } finally {
-      setVerifying(false);
+      setApiDone(true);
     }
   };
 
@@ -161,74 +165,93 @@ export default function DiagnosePage() {
           </motion.div>
 
           {/* Verification Engine */}
-          <div className="glass-panel" style={{ padding: '2rem' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>Verify Compatibility</h2>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem' }}>
-              <div style={{ flexGrow: 1, maxWidth: '400px' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Target ML Profile</label>
-                <select 
-                  value={selectedProfile} 
-                  onChange={(e) => setSelectedProfile(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-strong)', color: 'white', borderRadius: '8px', fontSize: '1rem', outline: 'none' }}
-                >
-                  {profiles.map(p => <option key={p.slug} value={p.slug}>{p.name}</option>)}
-                </select>
-              </div>
-              <button className="btn btn-primary" onClick={handleVerify} disabled={verifying || !selectedProfile}>
-                {verifying ? "Verifying..." : "Run Check"}
-              </button>
-            </div>
-
-            {verifyResult && (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{ padding: '1.5rem', background: verifyResult.issues.length === 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)', border: `1px solid ${verifyResult.issues.length === 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`, borderRadius: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  {verifyResult.issues.length === 0 ? <CheckCircle color="var(--brand-accent)" size={28} /> : <AlertTriangle color="#ef4444" size={28} />}
-                  <h3 style={{ margin: 0, color: verifyResult.issues.length === 0 ? 'var(--brand-accent)' : '#ef4444' }}>
-                    {verifyResult.issues.length === 0 ? "Compatible!" : `${verifyResult.issues.length} Issue(s) Found`}
-                  </h3>
+          {verifying ? (
+            <TerminalLoader
+              targetOs={report.os.name}
+              profileName={profiles.find(p => p.slug === selectedProfile)?.name || selectedProfile}
+              cudaVersion={report.cuda.version || undefined}
+              isResolved={apiDone}
+              onComplete={() => {
+                setVerifying(false);
+              }}
+              title="EnvForge Diagnostic Compiler"
+            />
+          ) : (
+            <div className="glass-panel" style={{ padding: '2rem' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Verify Compatibility</h2>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '2rem' }}>
+                <div style={{ flexGrow: 1, maxWidth: '400px' }}>
+                  <label style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Target ML Profile</label>
+                  <select 
+                    value={selectedProfile} 
+                    onChange={(e) => setSelectedProfile(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-strong)', color: 'white', borderRadius: '8px', fontSize: '1rem', outline: 'none' }}
+                  >
+                    {profiles.map(p => <option key={p.slug} value={p.slug}>{p.name}</option>)}
+                  </select>
                 </div>
+                <button className="btn btn-primary" onClick={handleVerify} disabled={verifying || !selectedProfile}>
+                  Run Check
+                </button>
+              </div>
 
-                {verifyResult.compatible_profiles.length > 0 && (
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Compatible Profiles:</p>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {verifyResult.compatible_profiles.map(slug => (
-                        <Link key={slug} href={`/generate?profile=${slug}`} style={{ padding: '0.4rem 0.8rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--brand-accent)', textDecoration: 'none' }}>
-                          {slug}
-                        </Link>
+              {error && (
+                <div style={{ color: "#ef4444", marginBottom: "1.5rem", fontSize: "0.9rem" }}>
+                  {error}
+                </div>
+              )}
+
+              {verifyResult && (
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{ padding: '1.5rem', background: verifyResult.issues.length === 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)', border: `1px solid ${verifyResult.issues.length === 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`, borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                    {verifyResult.issues.length === 0 ? <CheckCircle color="var(--brand-accent)" size={28} /> : <AlertTriangle color="#ef4444" size={28} />}
+                    <h3 style={{ margin: 0, color: verifyResult.issues.length === 0 ? 'var(--brand-accent)' : '#ef4444' }}>
+                      {verifyResult.issues.length === 0 ? "Compatible!" : `${verifyResult.issues.length} Issue(s) Found`}
+                    </h3>
+                  </div>
+
+                  {verifyResult.compatible_profiles.length > 0 && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Compatible Profiles:</p>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {verifyResult.compatible_profiles.map(slug => (
+                          <Link key={slug} href={`/generate?profile=${slug}`} style={{ padding: '0.4rem 0.8rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--brand-accent)', textDecoration: 'none' }}>
+                            {slug}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {verifyResult.issues.length > 0 && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Issues Detected:</p>
+                      <ul style={{ listStyleType: 'none', padding: 0 }}>
+                        {verifyResult.issues.map((issue, i) => (
+                          <li key={i} style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', marginBottom: '0.5rem', fontSize: '0.9rem', display: 'flex', gap: '0.75rem' }}>
+                            <ShieldAlert size={16} color={issue.severity === 'ERROR' ? '#ef4444' : '#eab308'} style={{ flexShrink: 0, marginTop: '2px' }} />
+                            <div>
+                              <div style={{ color: issue.severity === 'ERROR' ? '#fca5a5' : '#fde68a' }}>{issue.message}</div>
+                              {issue.suggested_fix && <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>💡 {issue.suggested_fix}</div>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {verifyResult.recommendations.length > 0 && (
+                    <div>
+                      <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Recommendations:</p>
+                      {verifyResult.recommendations.map((rec, i) => (
+                        <div key={i} style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>→ {rec}</div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {verifyResult.issues.length > 0 && (
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Issues Detected:</p>
-                    <ul style={{ listStyleType: 'none', padding: 0 }}>
-                      {verifyResult.issues.map((issue, i) => (
-                        <li key={i} style={{ padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', marginBottom: '0.5rem', fontSize: '0.9rem', display: 'flex', gap: '0.75rem' }}>
-                          <ShieldAlert size={16} color={issue.severity === 'ERROR' ? '#ef4444' : '#eab308'} style={{ flexShrink: 0, marginTop: '2px' }} />
-                          <div>
-                            <div style={{ color: issue.severity === 'ERROR' ? '#fca5a5' : '#fde68a' }}>{issue.message}</div>
-                            {issue.suggested_fix && <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>💡 {issue.suggested_fix}</div>}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {verifyResult.recommendations.length > 0 && (
-                  <div>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Recommendations:</p>
-                    {verifyResult.recommendations.map((rec, i) => (
-                      <div key={i} style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>→ {rec}</div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </div>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

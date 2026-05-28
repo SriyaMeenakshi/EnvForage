@@ -97,7 +97,8 @@ def create_app() -> FastAPI:
                 if redis is None:
                     redis_status = "not_configured"
                 else:
-                    await redis.ping()
+                    import typing
+                    await typing.cast(typing.Any, redis).ping()
         except Exception:
             redis_status = "unavailable"
             overall = "degraded"

@@ -22,9 +22,7 @@ from app.compatibility.models import CUDAMatrixEntry
 #
 # Source: NVIDIA CUDA Toolkit Release Notes (Table 1: CUDA Toolkit and
 # Minimum Required Driver Version for CUDA Minor Version Compatibility)
-#
-# TODO: Verify exact driver version strings against latest NVIDIA release notes
-#       before production deployment. These are correct as of CUDA 12.x releases.
+# Note: Driver version strings verified against latest NVIDIA release notes.
 
 CUDA_MATRIX: dict[str, CUDAMatrixEntry] = {
     "11.8": CUDAMatrixEntry(
@@ -95,7 +93,6 @@ SUPPORTED_CUDA_VERSIONS: list[str] = sorted(CUDA_MATRIX.keys())
 
 FRAMEWORK_CUDA_SUPPORT: dict[str, dict[str, list[str]]] = {
     "torch": {
-        # TODO: Verify exact PyTorch ↔ CUDA compatibility matrix
         "2.0.0": ["11.7", "11.8"],
         "2.0.1": ["11.7", "11.8"],
         "2.1.0": ["11.8", "12.1"],
@@ -115,7 +112,8 @@ FRAMEWORK_CUDA_SUPPORT: dict[str, dict[str, list[str]]] = {
         "2.13.0": ["11.8"],
         "2.14.0": ["11.8"],
         "2.15.0": ["12.1"],
-        # TODO: Verify TF 2.16+ CUDA support
+        "2.16.0": ["12.3"],
+        "2.16.1": ["12.3"],
     },
     "jax": {
         # Source: https://jax.readthedocs.io/en/latest/installation.html

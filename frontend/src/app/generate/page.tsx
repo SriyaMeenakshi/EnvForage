@@ -8,6 +8,7 @@ import { Profile, ScriptGenerationRequest, ScriptGenerationResponse } from "../.
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Check, ChevronRight, Download, Loader2, Server } from "lucide-react";
+import TerminalLoader from "../../components/TerminalLoader";
 
 function WizardContent() {
   const searchParams = useSearchParams();
@@ -24,6 +25,7 @@ function WizardContent() {
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   
   const [generating, setGenerating] = useState(false);
+  const [apiDone, setApiDone] = useState(false);
   const [result, setResult] = useState<ScriptGenerationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,22 +64,62 @@ function WizardContent() {
   }, []);
 
   const handleGenerate = async () => {
+    if (!activeProfile) return;
+
+    // 1. Normalize OS
+    let normalizedOs = targetOs;
+    if (!activeProfile.os_support.includes(targetOs)) {
+      normalizedOs = activeProfile.os_support[0] || "LINUX";
+      setTargetOs(normalizedOs);
+    }
+
+    // 2. Normalize Python
+    let normalizedPy = pythonVersion;
+    if (!activeProfile.python_versions.includes(pythonVersion)) {
+      normalizedPy = activeProfile.python_versions[0] || "";
+      setPythonVersion(normalizedPy);
+    }
+
+    // 3. Normalize CUDA
+    let normalizedCuda = cudaVersion;
+    if (activeProfile.cuda_required && activeProfile.cuda_versions) {
+      if (!activeProfile.cuda_versions.includes(cudaVersion)) {
+        normalizedCuda = activeProfile.cuda_versions[0] || "";
+        setCudaVersion(normalizedCuda);
+      }
+    } else {
+      normalizedCuda = "";
+      setCudaVersion("");
+    }
+
+    // 4. Normalize Output Formats
+    let normalizedFormats = [...outputFormats];
+    if (normalizedOs === "WIN") {
+      normalizedFormats = normalizedFormats.filter(f => f !== "setup.sh");
+    } else {
+      normalizedFormats = normalizedFormats.filter(f => f !== "setup.ps1");
+    }
+    if (normalizedFormats.length === 0) {
+      normalizedFormats = [normalizedOs === "WIN" ? "setup.ps1" : "setup.sh"];
+    }
+    setOutputFormats(normalizedFormats);
+
     setGenerating(true);
+    setApiDone(false);
     setError(null);
     try {
       const req: ScriptGenerationRequest = {
         profile_id: selectedProfile,
-        target_os: targetOs,
-        output_formats: outputFormats,
-        python_version: pythonVersion,
-        ...(activeProfile?.cuda_required && cudaVersion ? { cuda_version: cudaVersion } : {})
+        target_os: normalizedOs,
+        output_formats: normalizedFormats,
+        python_version: normalizedPy,
+        ...(activeProfile.cuda_required && normalizedCuda ? { cuda_version: normalizedCuda } : {})
       };
       const res = await api.generateScript(req);
       setResult(res);
-      setStep(3); // Move to results step
+      setApiDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate script");
-    } finally {
       setGenerating(false);
     }
   };
@@ -174,121 +216,136 @@ function WizardContent() {
 
         {/* Step 2: Configure */}
         {step === 2 && activeProfile && (
-          <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-panel" style={{ padding: '2rem' }}>
-            <h2 style={{ marginBottom: '0.5rem' }}>Configure Setup</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Targeting: <strong>{activeProfile.name}</strong></p>
+          generating ? (
+            <TerminalLoader
+              targetOs={targetOs}
+              profileName={activeProfile.name}
+              pythonVersion={pythonVersion}
+              cudaVersion={cudaVersion || undefined}
+              isResolved={apiDone}
+              onComplete={() => {
+                setStep(3);
+                setGenerating(false);
+              }}
+              title="EnvForge Script Compiler"
+            />
+          ) : (
+            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-panel" style={{ padding: '2rem' }}>
+              <h2 style={{ marginBottom: '0.5rem' }}>Configure Setup</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Targeting: <strong>{activeProfile.name}</strong></p>
 
-            <div style={{ marginBottom: '2rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>Target Operating System</label>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                {['LINUX', 'WSL', 'WIN'].map(os => {
-                  const isSupported = activeProfile.os_support.includes(os);
-                  return (
-                    <button 
-                      key={os}
-                      disabled={!isSupported}
-                      onClick={() => setTargetOs(os)}
-                      style={{
-                        flex: 1,
-                        padding: '1rem',
-                        background: targetOs === os ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                        border: `1px solid ${targetOs === os ? 'var(--brand-primary)' : 'var(--border-strong)'}`,
-                        borderRadius: '8px',
-                        color: isSupported ? 'var(--text-primary)' : 'var(--text-muted)',
-                        cursor: isSupported ? 'pointer' : 'not-allowed',
-                        fontFamily: 'var(--font-sans)',
-                        fontWeight: 500
-                      }}
-                    >
-                      {os}
-                      {!isSupported && <div style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>(Unsupported)</div>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>Python Version</label>
-                <select 
-                  value={pythonVersion} 
-                  onChange={(e) => setPythonVersion(e.target.value)}
-                  style={{
-                    width: '100%', padding: '0.75rem', borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-strong)',
-                    color: 'var(--text-primary)', fontFamily: 'var(--font-mono)'
-                  }}
-                >
-                  {activeProfile.python_versions.map(v => (
-                    <option key={v} value={v} style={{ background: '#1e1e1e' }}>{v}</option>
-                  ))}
-                </select>
+              <div style={{ marginBottom: '2rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>Target Operating System</label>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  {['LINUX', 'WSL', 'WIN'].map(os => {
+                    const isSupported = activeProfile.os_support.includes(os);
+                    return (
+                      <button 
+                        key={os}
+                        disabled={!isSupported}
+                        onClick={() => setTargetOs(os)}
+                        style={{
+                          flex: 1,
+                          padding: '1rem',
+                          background: targetOs === os ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                          border: `1px solid ${targetOs === os ? 'var(--brand-primary)' : 'var(--border-strong)'}`,
+                          borderRadius: '8px',
+                          color: isSupported ? 'var(--text-primary)' : 'var(--text-muted)',
+                          cursor: isSupported ? 'pointer' : 'not-allowed',
+                          fontFamily: 'var(--font-sans)',
+                          fontWeight: 500
+                        }}
+                      >
+                        {os}
+                        {!isSupported && <div style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>(Unsupported)</div>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {activeProfile.cuda_required && activeProfile.cuda_versions && (
+              <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>CUDA Version</label>
+                  <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>Python Version</label>
                   <select 
-                    value={cudaVersion} 
-                    onChange={(e) => setCudaVersion(e.target.value)}
+                    value={pythonVersion} 
+                    onChange={(e) => setPythonVersion(e.target.value)}
                     style={{
                       width: '100%', padding: '0.75rem', borderRadius: '8px',
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid var(--brand-accent)',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-strong)',
                       color: 'var(--text-primary)', fontFamily: 'var(--font-mono)'
                     }}
                   >
-                    {activeProfile.cuda_versions.map(v => (
+                    {activeProfile.python_versions.map(v => (
                       <option key={v} value={v} style={{ background: '#1e1e1e' }}>{v}</option>
                     ))}
                   </select>
                 </div>
-              )}
-            </div>
 
-            <div style={{ marginBottom: '3rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>Output Formats</label>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                {['setup.sh', 'setup.ps1', 'requirements.txt', 'Dockerfile'].map(fmt => {
-                  // Disable setup.ps1 if OS is Linux, and vice versa
-                  if (fmt === 'setup.sh' && targetOs === 'WIN') return null;
-                  if (fmt === 'setup.ps1' && targetOs !== 'WIN') return null;
-                  
-                  return (
-                    <button 
-                      key={fmt}
-                      onClick={() => toggleFormat(fmt)}
+                {activeProfile.cuda_required && activeProfile.cuda_versions && (
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>CUDA Version</label>
+                    <select 
+                      value={cudaVersion} 
+                      onChange={(e) => setCudaVersion(e.target.value)}
                       style={{
-                        padding: '0.75rem 1.5rem',
-                        background: outputFormats.includes(fmt) ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                        border: `1px solid ${outputFormats.includes(fmt) ? 'var(--brand-primary)' : 'var(--border-strong)'}`,
-                        borderRadius: '8px',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '0.9rem'
+                        width: '100%', padding: '0.75rem', borderRadius: '8px',
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid var(--brand-accent)',
+                        color: 'var(--text-primary)', fontFamily: 'var(--font-mono)'
                       }}
                     >
-                      {fmt}
-                    </button>
-                  );
-                })}
+                      {activeProfile.cuda_versions.map(v => (
+                        <option key={v} value={v} style={{ background: '#1e1e1e' }}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {error && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                {error}
+              <div style={{ marginBottom: '3rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 500 }}>Output Formats</label>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  {['setup.sh', 'setup.ps1', 'requirements.txt', 'Dockerfile'].map(fmt => {
+                    // Disable setup.sh if OS is Linux, and vice versa
+                    if (fmt === 'setup.sh' && targetOs === 'WIN') return null;
+                    if (fmt === 'setup.ps1' && targetOs !== 'WIN') return null;
+                    
+                    return (
+                      <button 
+                        key={fmt}
+                        onClick={() => toggleFormat(fmt)}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          background: outputFormats.includes(fmt) ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                          border: `1px solid ${outputFormats.includes(fmt) ? 'var(--brand-primary)' : 'var(--border-strong)'}`,
+                          borderRadius: '8px',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {fmt}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
-              <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
-              <button className="btn btn-primary" onClick={handleGenerate} disabled={generating}>
-                {generating ? <><Loader2 className="animate-spin" size={18} style={{ marginRight: '0.5rem' }} /> Generating...</> : "Generate Scripts"}
-              </button>
-            </div>
-          </motion.div>
+              {error && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  {error}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
+                <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
+                <button className="btn btn-primary" onClick={handleGenerate} disabled={generating}>
+                  {generating ? <><Loader2 className="animate-spin" size={18} style={{ marginRight: '0.5rem' }} /> Generating...</> : "Generate Scripts"}
+                </button>
+              </div>
+            </motion.div>
+          )
         )}
 
         {/* Step 3: Result */}

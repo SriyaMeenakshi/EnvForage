@@ -10,6 +10,7 @@ Pipeline:
 
 import asyncio
 import hashlib
+import json
 import logging
 import time
 import uuid
@@ -19,14 +20,11 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.models import (
-    TroubleshootRequest,
-    TroubleshootResponse,
-)
-from app.ai.prompts.system import TROUBLESHOOT_SYSTEM_PROMPT
+from app.ai.models import SuggestedFix, TroubleshootRequest, TroubleshootResponse
+from app.ai.prompts.system import LOW_CONFIDENCE_GATE, TROUBLESHOOT_SYSTEM_PROMPT
 from app.ai.prompts.troubleshoot import TroubleshootPromptBuilder
 from app.ai.providers import get_provider
-from app.ai.providers.base import LLMProviderError
+from app.ai.providers.base import LLMProvider, LLMProviderError
 from app.models.ai_session import AIAuditLog, AISession, AISuggestion
 from app.templates.safety import SafetyViolationError, validate_rendered_output
 
@@ -47,7 +45,8 @@ class AITroubleshootService:
         response = await service.troubleshoot(request, db_session)
     """
 
-    def __init__(self) -> None:
+    def __init__(self,provider: LLMProvider | None = None) -> None:
+        self._provider=provider
         self._prompt_builder = TroubleshootPromptBuilder()
 
     async def troubleshoot(
@@ -82,7 +81,7 @@ class AITroubleshootService:
         logger.info("Troubleshoot prompt built (%d chars)", len(user_message))
 
         # ── Step 2: Call LLM ──────────────────────────────────────────────
-        provider = get_provider()
+        provider = self._provider if self._provider is not None else get_provider()
         provider_name = type(provider).__name__
         model_name = getattr(provider, "model", "unknown")
 
@@ -135,6 +134,15 @@ class AITroubleshootService:
             fix.repair_template_id is not None for fix in llm_result.suggested_fixes
         )
 
+        # ── Step 4b: Confidence gating ────────────────────────────────────
+        accepted_fixes, suppressed_count = self._gate_fixes(
+            llm_result.suggested_fixes, session_id
+        )
+        llm_result.suggested_fixes = accepted_fixes
+        llm_result.suppressed_fix_count = suppressed_count
+        llm_result.confidence = self._recalculate_overall_confidence(accepted_fixes)
+        self._log_confidence_audit(session_id, accepted_fixes, suppressed_count)
+
         # ── Step 5: Persist to DB ─────────────────────────────────────────
         latency_ms = int((time.monotonic() - start_time) * 1000)
         token_usage = getattr(provider, "last_token_usage", None)
@@ -173,7 +181,6 @@ class AITroubleshootService:
         )
 
         return llm_result
-
     async def stream_troubleshoot(
         self,
         request: TroubleshootRequest,
@@ -384,3 +391,73 @@ class AITroubleshootService:
             db.add(log)
         except Exception as exc:
             logger.error("Failed to write audit log: %s", exc)
+
+
+#confidence gating
+
+    def _gate_fixes(
+        self, fixes: list[SuggestedFix], session_id: str
+    ) -> tuple[list[SuggestedFix], int]:
+        """Suppress fixes whose confidence_score is below LOW_CONFIDENCE_GATE."""
+        accepted, suppressed = [], 0
+        for fix in fixes:
+            if (fix.confidence_score or 0.0) < LOW_CONFIDENCE_GATE:
+                logger.warning(
+                    "session=%s step=%d '%s' suppressed (score=%.2f < gate=%.2f)",
+                    session_id, fix.step, fix.title,
+                    fix.confidence_score, LOW_CONFIDENCE_GATE,
+                )
+                suppressed += 1
+            else:
+                accepted.append(fix)
+        return accepted, suppressed
+
+    #Overall confidence recalculation
+
+    def _recalculate_overall_confidence(self, fixes: list[SuggestedFix]) -> float:
+        """
+        Weighted average of per-fix scores.
+        CRITICAL=3×, WARNING=2×, INFO=1× weight.
+        Returns 0.0 if no fixes present.
+        """
+        if not fixes:
+            return 0.0
+        weight_map = {"CRITICAL": 3.0, "WARNING": 2.0, "INFO": 1.0}
+        total_w, weighted_sum = 0.0, 0.0
+        for fix in fixes:
+            w = weight_map.get(fix.severity, 1.0)
+            weighted_sum += (fix.confidence_score or 0.0) * w
+            total_w += w
+        return round(weighted_sum / total_w, 4)
+
+    #Audit logging
+
+    def _log_confidence_audit(
+        self, session_id: str, fixes: list[SuggestedFix], suppressed: int
+    ) -> None:
+        for fix in fixes:
+            logger.info(
+                "CONFIDENCE_AUDIT session=%s step=%d level=%s score=%.2f matrix_backed=%s severity=%s",
+                session_id, fix.step, fix.confidence_level.value if fix.confidence_level else "unknown",
+                fix.confidence_score, fix.is_matrix_backed, fix.severity,
+            )
+        if suppressed:
+            logger.info("CONFIDENCE_AUDIT session=%s suppressed_fixes=%d", session_id, suppressed)
+
+    #Prompt builder
+
+    def _build_user_message(self, request: TroubleshootRequest) -> str:
+        parts = [
+            "## Diagnostic Report", json.dumps(request.diagnostic, indent=2), "",
+            "## Verification Results", json.dumps(request.verification, indent=2), "",
+            "## Environment Profile", json.dumps(request.profile, indent=2),
+        ]
+        if request.user_description.strip():
+            parts += ["", "## User Description", request.user_description.strip()]
+        parts += [
+            "", "## Instructions",
+            f"Return a TroubleshootResponse JSON. Max {request.max_words} words. "
+            "Populate confidence_level, confidence_score, is_matrix_backed, "
+            "uncertainty_reason, and fallback_recommendation for EVERY SuggestedFix.",
+        ]
+        return "\n".join(parts)

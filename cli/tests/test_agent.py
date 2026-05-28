@@ -321,7 +321,44 @@ class TestPythonDetector:
         result = _inspect_python(sys.executable)
         assert result is not None
         assert result.version
-        assert result.path == sys.executable or Path(result.path).resolve() == Path(sys.executable).resolve()
+        path_str = result.path
+        if path_str.startswith("<USER_HOME>"):
+            path_str = path_str.replace("<USER_HOME>", str(Path.home()), 1)
+        assert path_str == sys.executable or Path(path_str).resolve() == Path(sys.executable).resolve()
+
+    @patch("subprocess.Popen")
+    @patch("psutil.Process")
+    def test_inspect_python_timeout(self, mock_psutil_process: MagicMock, mock_popen: MagicMock) -> None:
+        import subprocess
+        from envforge_agent.detectors.python_detector import _inspect_python
+
+        # Mock Popen instance
+        mock_proc = MagicMock()
+        # Mock communicate to raise TimeoutExpired on the first call, and succeed on the second
+        mock_proc.communicate.side_effect = [
+            subprocess.TimeoutExpired(cmd="mock_python", timeout=10),
+            ("", "")
+        ]
+        mock_proc.pid = 12345
+        mock_popen.return_value = mock_proc
+
+        # Mock psutil Process instance
+        mock_psutil_proc_inst = MagicMock()
+        mock_child = MagicMock()
+        mock_psutil_proc_inst.children.return_value = [mock_child]
+        mock_psutil_process.return_value = mock_psutil_proc_inst
+
+        # Run inspect
+        result = _inspect_python("mock_python")
+
+        # Verify result is None
+        assert result is None
+
+        # Verify child and parent were killed
+        mock_child.kill.assert_called_once()
+        mock_proc.kill.assert_called_once()
+        # Verify communicate was called again to reap the process
+        assert mock_proc.communicate.call_count == 2
 
 
 # ── System Detector tests ─────────────────────────────────────────────────────
