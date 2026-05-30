@@ -2,9 +2,9 @@
 envforge CLI — main command group and subcommands.
 
 Commands:
-  envforge diagnose   Collect and display a DiagnosticReport
+  envforge diagnose    Collect and display a DiagnosticReport
   envforge verify     Check if a profile is compatible with this system
-  envforge fix        Generate a repair script from a saved report
+  envforge fix         Generate a repair script from a saved report
   envforge rollback   Restore a venv from a backup directory
 """
 
@@ -14,6 +14,7 @@ import json
 import sys
 import platform
 from pathlib import Path
+import asyncio
 
 import click
 import asyncio
@@ -123,6 +124,8 @@ def cli(ctx: click.Context, no_color: bool) -> None:
     show_default=True,
     help="Timeout in seconds for each detector subprocess call. Default: 30s.",
 )
+def diagnose(output: str | None, send: bool, api_url: str, quiet: bool, sarif: bool, timeout: int, output_format: str = "json") -> None:
+    asyncio.run(_diagnose(output, send, api_url, quiet, sarif, timeout, output_format))
 
 def diagnose(output: str | None, send: bool, api_url: str, quiet: bool, sarif: bool, timeout: int, output_format: str) -> None:
     asyncio.run(_diagnose(output, send, api_url, quiet, sarif, timeout, output_format))
@@ -130,9 +133,6 @@ def diagnose(output: str | None, send: bool, api_url: str, quiet: bool, sarif: b
 async def _diagnose(output: str | None, send: bool, api_url: str, quiet: bool, sarif: bool, timeout: int, output_format: str) -> None:
     """
     Collect a full diagnostic report of this machine's ML environment.
-
-    Detects: OS, CPU, RAM, GPU, CUDA, cuDNN, Python installations.
-    Outputs: DiagnosticReport JSON compatible with POST /api/v1/diagnose.
     """
     if not quiet:
         console.print(
@@ -195,7 +195,6 @@ def _print_report_summary(report: DiagnosticReport) -> None:
         cpu_str += "  [yellow]⚠ WARNING: Under 4 cores — data loading may bottleneck training[/]"
     table.add_row("CPU", cpu_str)
 
-
     ram_str = f"{report.ram.total_gb} GB total, {report.ram.available_gb} GB free"
     if report.ram.total_gb < 8:
         ram_str += "  [bold red][!] CRITICAL: Under 8 GB — heavy ML profiles will fail[/]"
@@ -209,7 +208,6 @@ def _print_report_summary(report: DiagnosticReport) -> None:
     elif report.disk.available_gb < 20:
         disk_str += "  [yellow]⚠ WARNING: Low disk space — GPU profiles need 20+ GB[/]"
     table.add_row("Disk Free", disk_str)
-
 
     if report.gpus:
         for gpu in report.gpus:
@@ -393,9 +391,7 @@ def verify(profile: str | None, output: str | None, quiet: bool) -> None:
             click.echo(json.dumps(res, indent=2))
             sys.exit(1)
 
-
         data = json.loads(proc.stdout.strip())
-
 
         # 3. Analyze checks
         if not data["import_ok"]:
@@ -409,15 +405,12 @@ def verify(profile: str | None, output: str | None, quiet: bool) -> None:
             click.echo(json.dumps(res, indent=2))
             sys.exit(1)
 
-
         # Check if CUDA profile is detected
         is_gpu_profile = False
         if profile:
             is_gpu_profile = any(
                 term in profile.lower() for term in ["cuda", "gpu", "diffusion", "finetune"]
             )
-
-            is_gpu_profile = any(term in profile.lower() for term in ["cuda", "gpu", "diffusion", "finetune"])
 
         if is_gpu_profile and not data["cuda_ok"]:
             if not quiet:
@@ -430,7 +423,6 @@ def verify(profile: str | None, output: str | None, quiet: bool) -> None:
             click.echo(json.dumps(res, indent=2))
             sys.exit(1)
 
-
         # All required checks passed!
         msg = "Environment works: PyTorch imported successfully"
         if data["cuda_ok"]:
@@ -440,8 +432,6 @@ def verify(profile: str | None, output: str | None, quiet: bool) -> None:
 
         if not quiet:
             _print_verification_summary(data, is_gpu_profile=is_gpu_profile)
-
-        res = {"status": "PASS", "message": msg}
 
         res = {
             "status": "PASS",
@@ -506,7 +496,6 @@ def _print_verification_summary(data: dict, is_gpu_profile: bool) -> None:
 
     table.add_row("Required CUDA Profile", "[dim]INFO[/]", ">= 11.8 (Recommended for CUDA paths)")
 
-
     console.print("\n[bold]=== Verification Report ===[/]")
     console.print(table)
 
@@ -518,7 +507,7 @@ def _print_verification_summary(data: dict, is_gpu_profile: bool) -> None:
 @click.option(
     "--report",
     "-r",
-    type=click.Path(exists=True, dir_okay=False, readable=True),
+    type=click.Path(dir_okay=False, readable=True),
     required=True,
     help="Path to a saved DiagnosticReport JSON file.",
 )
@@ -579,10 +568,8 @@ async def _fix(report: str, profile: str, api_url: str, dry_run: bool) -> None:
 
         console.print(f"[green][+][/] Scripts generated (job: {result.get('job_id', '?')})")
 
-
         if result.get("resolved_packages"):
             console.print(f"  [cyan]Resolved Packages:[/] {', '.join(result['resolved_packages'])}")
-
 
         if dry_run:
             console.print("\n[bold]Files to be generated:[/]")
@@ -608,7 +595,10 @@ async def _fix(report: str, profile: str, api_url: str, dry_run: bool) -> None:
         sys.exit(1)
 
 cli.add_command(audit_command)
+
+
 # ── envforge rollback ──────────────────────────────────────────────────────────
+
 
 @cli.command("rollback")
 def rollback() -> None:
@@ -713,6 +703,10 @@ def rollback() -> None:
         err_console.print(f"[ERROR] Rollback failed: {e}")
         sys.exit(1)
 
+
+# ── envforge troubleshoot ──────────────────────────────────────────────────────
+
+
 @cli.command("troubleshoot")
 @click.option(
     "--api-url",
@@ -721,7 +715,6 @@ def rollback() -> None:
     envvar="ENVFORGE_API_URL",
     help="Base URL of the EnvForge API.",
 )
-
 def troubleshoot(api_url: str) -> None:
     asyncio.run(_troubleshoot(api_url))
 
@@ -730,7 +723,6 @@ async def _troubleshoot(api_url: str) -> None:
     Send diagnostic report to AI troubleshoot endpoint
     and stream analysis results live to terminal.
     """
-
     console.print(Panel(
         "[bold cyan]EnvForge AI Troubleshooter[/]\n"
         "[dim]Analyzing environment issues...[/]",
@@ -739,7 +731,6 @@ async def _troubleshoot(api_url: str) -> None:
 
     # Build diagnostic report
     report = ReportBuilder().build()
-
     url = f"{api_url.rstrip('/')}/api/v1/troubleshoot"
 
     console.print(f"\n[bold]Connecting to[/] {url}\n")
@@ -779,124 +770,62 @@ async def _troubleshoot(api_url: str) -> None:
                         # accumulate streamed fragments
                         buffer += chunk
 
-            # Parse completed JSON after stream ends
             try:
-
                 parsed = json.loads(buffer)
 
                 if parsed.get("error"):
-
-                    err_console.print(
-                        f"[ERROR] {parsed.get('message', parsed['error'])}"
-                    )
-
+                    err_console.print(f"[ERROR] {parsed.get('message', parsed['error'])}")
                     sys.exit(1)
 
                 # Root Cause
                 console.print("\n[bold red]Root Cause:[/]")
-                console.print(
-                    parsed.get("root_cause", "Unknown")
-                )
+                console.print(parsed.get("root_cause", "Unknown"))
 
                 # Suggested Fixes
                 if parsed.get("suggested_fixes"):
-
-                    console.print(
-                        "\n[bold yellow]Suggested Fixes:[/]"
-                    )
-
+                    console.print("\n[bold yellow]Suggested Fixes:[/]")
                     for fix in parsed["suggested_fixes"]:
-
-                        console.print(
-                            f"\n[bold]{fix['step']}.[/] {fix['title']}"
-                        )
-
-                        console.print(
-                            f"   Severity: {fix['severity']}"
-                        )
-
-                        console.print(
-                            f"   {fix['description']}"
-                        )
+                        console.print(f"\n[bold]{fix['step']}.[/] {fix['title']}")
+                        console.print(f"   Severity: {fix['severity']}")
+                        console.print(f"   {fix['description']}")
 
                         if fix.get("safe_commands"):
-
                             console.print("   Commands:")
-
                             for cmd in fix["safe_commands"]:
-
-                                console.print(
-                                    f"    • {cmd}"
-                                )
+                                console.print(f"    • {cmd}")
 
                 # Confidence
                 if parsed.get("confidence") is not None:
+                    console.print(f"\n[bold cyan]Confidence:[/] {parsed['confidence']}")
 
-                    console.print(
-                        f"\n[bold cyan]Confidence:[/] "
-                        f"{parsed['confidence']}"
-                    )
-
-                console.print(
-                    "\n[bold green][+] Troubleshooting complete[/]"
-                )
+                console.print("\n[bold green][+] Troubleshooting complete[/]")
 
             except json.JSONDecodeError:
-
-                err_console.print(
-                    "[ERROR] Failed to parse streamed AI response."
-                )
-
+                err_console.print("[ERROR] Failed to parse streamed AI response.")
                 sys.exit(1)
 
     except httpx.ConnectError:
-
-        err_console.print(
-            f"[ERROR] Cannot connect to {url}"
-        )
-
-        err_console.print(
-            "Hint: Make sure the EnvForge backend API is running."
-        )
-
+        err_console.print(f"[ERROR] Cannot connect to {url}")
+        err_console.print("Hint: Make sure the EnvForge backend API is running.")
         sys.exit(1)
-
     except httpx.HTTPStatusError as exc:
-
-        err_console.print(
-            f"[ERROR] API returned {exc.response.status_code}"
-        )
-
+        err_console.print(f"[ERROR] API returned {exc.response.status_code}")
         try:
-
             error_text = exc.response.read().decode()
-
             err_console.print(error_text)
-
         except Exception:
-
-            err_console.print(
-                "[ERROR] Unable to read error response body."
-            )
-
+            err_console.print("[ERROR] Unable to read error response body.")
         sys.exit(1)
-
     except KeyboardInterrupt:
-
-        err_console.print(
-            "\n[!] Troubleshooting interrupted by user."
-        )
-
+        err_console.print("\n[!] Troubleshooting interrupted by user.")
         sys.exit(1)
-
     except Exception as exc:
-
-        err_console.print(
-            f"[ERROR] Unexpected error: {exc}"
-        )
+        err_console.print(f"[ERROR] Unexpected error: {exc}")
         sys.exit(1)
+
 
 # ── envforge list ──────────────────────────────────────────────────────────────
+
 
 @cli.command("list")
 @click.option(
@@ -990,6 +919,7 @@ def list_profiles(api_url: str, quiet: bool, filter_tag: str | None) -> None:
         f"Run [bold]envforge fix --profile <slug>[/] to generate a setup script.[/]"
     )
 
+
 def _print_profiles_table(profiles: list, filter_tag: str | None) -> None:
     table = Table(box=box.ROUNDED, show_header=True, padding=(0, 1), expand=False)
     table.add_column("Slug", style="bold cyan", no_wrap=True)
@@ -998,19 +928,11 @@ def _print_profiles_table(profiles: list, filter_tag: str | None) -> None:
     table.add_column("Description")
 
     for profile in profiles:
-        if isinstance(profile, str):
-            table.add_row(profile, "—", "—", "—")
-        else:
-            slug = profile.get("slug") or profile.get("id") or "?"
-            name = profile.get("name", "—")
-            description = profile.get("description", "—")
-            tags = profile.get("tags") or []
-            tag_str = ", ".join(tags) if tags else "[dim]none[/]"
-            table.add_row(slug, name, tag_str, description)
+        if isinstance(profile, dict):
+            slug = profile.get("slug", "N/A")
+            name = profile.get("name", "Unknown")
+            tags = ", ".join(profile.get("tags", []))
+            desc = profile.get("description", "")
+            table.add_row(slug, name, tags, desc)
 
-    header = "[bold]Available Profiles[/]"
-    if filter_tag:
-        header += f" [dim](filtered by tag: {filter_tag})[/]"
-
-    console.print(f"\n{header}")
     console.print(table)

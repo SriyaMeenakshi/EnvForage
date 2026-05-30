@@ -9,9 +9,7 @@ from app.config import get_settings
 
 router = APIRouter()
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SK = get_settings().secret_key
-if not SK:
-    raise RuntimeError("SECRET_KEY environment variable is not set")
+
 
 
 class RegData(BaseModel):
@@ -49,5 +47,6 @@ def signin(data: LoginData) -> dict[str, str]:
     if not usr or not pwd.verify(data.password, usr["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     exp = datetime.now(UTC) + timedelta(hours=24)
-    token = jwt.encode({"email": data.email, "exp": exp}, SK, algorithm="HS256")
+    settings = get_settings()
+    token = jwt.encode({"email": data.email, "exp": exp}, settings.secret_key, algorithm="HS256")
     return {"token": token, "email": data.email}

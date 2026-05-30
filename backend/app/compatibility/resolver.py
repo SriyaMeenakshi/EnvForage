@@ -18,6 +18,9 @@ Usage:
         cuda_required=True,
     )
 """
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import Version
+
 from app.compatibility.errors import (
     IncompatibilityError,
     UnknownVersionError,
@@ -30,7 +33,7 @@ from app.compatibility.matrix.cuda import (
 from app.compatibility.matrix.os_rules import get_os_notes
 from app.compatibility.matrix.python import (
     get_framework_entry,
-    get_latest_compatible_version,
+    get_framework_versions,
 )
 from app.compatibility.matrix.rocm import (
     ROCM_MATRIX,
@@ -212,7 +215,7 @@ class CompatibilityResolver:
         spec_version = constraint.version_spec
 
         # Check if the version spec is an exact version (no operators)
-        if not any(op in spec_version for op in [">=", "<=", "!=", ">", "<", "~="]):
+        if not any(op in spec_version for op in [">=", "<=", "!=", ">", "<", "~=", "=="]):
             # Exact version — validate it and use it directly
             return self._resolve_exact_version(
                 package_name=package_name,
@@ -222,30 +225,91 @@ class CompatibilityResolver:
                 rocm_version=rocm_version,
             )
 
-        # Range spec — find the latest compatible version within range
-        # For now, defer to the matrix for well-known packages
-        latest = get_latest_compatible_version(
-            framework=package_name,
+        return self._resolve_version_range(
+            package_name=package_name,
+            version_spec=spec_version,
             python_version=python_version,
             cuda_version=cuda_version,
             rocm_version=rocm_version,
+            cuda_variant=constraint.cuda_variant,
         )
-        if latest is not None:
-            gpu_variant = self._resolve_gpu_variant(
-                package_name, latest, cuda_version, rocm_version
-            )
+
+
+    def _resolve_version_range(
+        self,
+        package_name: str,
+        version_spec: str,
+        python_version: str,
+        cuda_version: str | None,
+        rocm_version: str | None,
+        cuda_variant: str | None,
+    ) -> ResolvedPackage:
+        """
+        Resolve a semantic version range and select the highest
+        compatible version from the compatibility matrix.
+        """
+
+        entries = get_framework_versions(package_name)
+
+        # Package not in matrix — preserve existing behavior
+        if not entries:
             return ResolvedPackage(
                 name=package_name,
-                version=latest,
-                cuda_variant=gpu_variant,
+                version=version_spec,
+                cuda_variant=cuda_variant,
             )
 
-        # Package not in matrix — use spec as-is with a warning
-        # (e.g., pip, setuptools, or other non-framework packages)
-        return ResolvedPackage(
-            name=package_name,
-            version=spec_version.lstrip(">=<!=~"),
-            cuda_variant=constraint.cuda_variant,
+        try:
+            spec = SpecifierSet(version_spec)
+        except InvalidSpecifier as exc:
+            raise IncompatibilityError(
+                component=package_name,
+                constraint=version_spec,
+                detected="Invalid version specifier",
+                suggestion="Provide a valid semantic version constraint.",
+            ) from exc
+
+        matching_entries = []
+
+        for entry in entries:
+            if python_version not in entry.supported_python:
+                continue
+
+            if cuda_version is not None and entry.supported_cuda:
+                if cuda_version not in entry.supported_cuda:
+                    continue
+
+            if rocm_version is not None and entry.supported_rocm:
+                if rocm_version not in entry.supported_rocm:
+                    continue
+
+            if Version(entry.version) in spec:
+                matching_entries.append(entry)
+
+        if not matching_entries:
+            raise IncompatibilityError(
+                component=package_name,
+                constraint=version_spec,
+                detected="No compatible versions found",
+                suggestion=(
+                    "No versions in the compatibility matrix satisfy "
+                    "the requested constraint and environment."
+                ),
+            )
+
+        matching_entries.sort(
+            key=lambda entry: Version(entry.version),
+            reverse=True,
+        )
+
+        selected = matching_entries[0]
+
+        return self._resolve_exact_version(
+            package_name=package_name,
+            version=selected.version,
+            python_version=python_version,
+            cuda_version=cuda_version,
+            rocm_version=rocm_version,
         )
 
     def _resolve_exact_version(

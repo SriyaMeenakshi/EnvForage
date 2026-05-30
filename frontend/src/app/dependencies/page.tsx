@@ -1,23 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Zap, 
-  Settings, 
-  Database, 
-  Cpu, 
   HelpCircle, 
   Search, 
-  RefreshCw, 
   ZoomIn, 
   ZoomOut, 
   Maximize2, 
-  Layers, 
-  BookOpen, 
   FileText, 
-  Server, 
-  Sliders, 
   Network
 } from "lucide-react";
 

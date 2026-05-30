@@ -150,8 +150,10 @@ async def create_profile(
     """
     Create a new environment profile.
     """
+    logger.info("Admin write: creating profile slug=%s", profile_in.slug)
     try:
         profile = await profile_service.create_profile(db, profile_in)
+        logger.info("Profile created: slug=%s", profile.slug)
         return ProfileDetailSchema.model_validate(profile)
     except IntegrityError as exc:
         await db.rollback()
@@ -188,9 +190,11 @@ async def delete_profile(
     """
     Soft delete a profile by slug.
     """
+    logger.info("Admin write: deleting profile slug=%s", slug)
     deleted = await profile_service.delete_profile(db, slug)
     if not deleted:
         raise EntityNotFoundError(
             resource=f"Profile '{slug}'",
             error_code="PROFILE_NOT_FOUND",
         )
+    logger.info("Profile deleted: slug=%s", slug)

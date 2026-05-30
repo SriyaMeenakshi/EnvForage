@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
 
-
+DEV_SECRET_KEY = "dev-secret-key-change-in-production"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     # ── Application ───────────────────────────────────────────
     environment: Literal["development", "staging", "production"] = "development"
     debug: bool = False
-    secret_key: str = "dev-secret-key-change-in-production"
+    secret_key: str = DEV_SECRET_KEY
     app_name: str = "EnvForage"
     app_version: str = "1.0.0"
     custom_template_dir: Path | None = None
@@ -68,17 +69,27 @@ class Settings(BaseSettings):
     rate_limit_ai_rpm: int = 10       # AI troubleshoot: requests per minute
     rate_limit_repair_rpm: int = 20   # Repair endpoint: requests per minute
     rate_limit_general_rpm: int = 60  # General API: requests per minute
-
     # ── Admin API Key ─────────────────────────────────────────
-    # Protects write operations on shared resources (profile create/delete,
-    # future admin-only endpoints).  Set via ADMIN_API_KEY env var.
-    # When unset the application will refuse all admin requests to avoid
-    # silently running unprotected in production.
     admin_api_key: str = ""
 
+    @model_validator(mode="after")
+    def validate_secret_key(self) -> "Settings":
+        """
+        Validate that the default development secret key is not used in production.
+        """
+        if (
+            self.environment == "production"
+            and self.secret_key == DEV_SECRET_KEY
+        ):
+            raise ValueError(
+                "Production environment requires a strong SECRET_KEY."
+            )
+        return self
 
 @lru_cache
 def get_settings() -> Settings:
     """Return cached settings singleton."""
     return Settings()
+
+
 

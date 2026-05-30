@@ -8,6 +8,7 @@ version = "1.0.0"
 description = "EnvForge Backend API — ML Environment Provisioning Platform"
 requires-python = ">=3.11"
 dependencies = [
+    "prometheus-client>=0.20.0",
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.29.0",
     "pydantic[email]>=2.7.0",

@@ -266,3 +266,70 @@ def test_rocm_version_override_failure():
         )
     assert exc.value.component == "rocm"
 
+
+def test_semver_range_resolution():
+    result = R.resolve(
+        packages=[PackageConstraint("torch", ">=2.0.0,<2.3.0")],
+        python_version="3.11",
+        cuda_version="11.8",
+        target_os="LINUX",
+        profile_slug="pytorch-cuda",
+        os_support=["LINUX", "WSL"],
+        cuda_required=True,
+    )
+
+    assert result.packages[0].version == "2.2.2"
+
+
+def test_wildcard_version_resolution():
+    result = R.resolve(
+        packages=[PackageConstraint("torch", "==2.1.*")],
+        python_version="3.11",
+        cuda_version="11.8",
+        target_os="LINUX",
+        profile_slug="pytorch-cuda",
+        os_support=["LINUX", "WSL"],
+        cuda_required=True,
+    )
+
+    assert result.packages[0].version == "2.1.2"
+
+
+def test_compatible_release_resolution():
+    result = R.resolve(
+        packages=[PackageConstraint("torch", "~=2.1")],
+        python_version="3.11",
+        cuda_version="11.8",
+        target_os="LINUX",
+        profile_slug="pytorch-cuda",
+        os_support=["LINUX", "WSL"],
+        cuda_required=True,
+    )
+
+    assert result.packages[0].version == "2.5.0"
+
+
+def test_invalid_semver_specifier():
+    with pytest.raises(IncompatibilityError):
+        R.resolve(
+            packages=[PackageConstraint("torch", ">>>invalid<<<")],
+            python_version="3.11",
+            cuda_version="11.8",
+            target_os="LINUX",
+            profile_slug="pytorch-cuda",
+            os_support=["LINUX", "WSL"],
+            cuda_required=True,
+        )
+
+
+def test_no_matching_semver_range():
+    with pytest.raises(IncompatibilityError):
+        R.resolve(
+            packages=[PackageConstraint("torch", ">=99.0.0")],
+            python_version="3.11",
+            cuda_version="11.8",
+            target_os="LINUX",
+            profile_slug="pytorch-cuda",
+            os_support=["LINUX", "WSL"],
+            cuda_required=True,
+        )

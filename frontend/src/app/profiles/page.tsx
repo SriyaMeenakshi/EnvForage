@@ -112,11 +112,10 @@ export default function ProfilesPage() {
             <span>Filters:</span>
           </div>
 
-          {/* OS Dropdown */}
           <select
             value={selectedOS}
             onChange={(e) => setSelectedOS(e.target.value)}
-            style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '0.5rem 1rem', outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
+            style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '0.5rem 1rem', outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
           >
             <option value="ALL">All Operating Systems</option>
             <option value="WINDOWS">Windows</option>
@@ -124,11 +123,10 @@ export default function ProfilesPage() {
             <option value="WSL">WSL</option>
           </select>
 
-          {/* CUDA Dropdown */}
           <select
             value={cudaFilter}
             onChange={(e) => setCudaFilter(e.target.value)}
-            style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '0.5rem 1rem', outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
+            style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '0.5rem 1rem', outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
           >
             <option value="ALL">All CUDA Configs</option>
             <option value="REQUIRED">CUDA Required</option>

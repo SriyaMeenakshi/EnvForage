@@ -181,3 +181,25 @@ async def test_delete_profile_without_admin_key_returns_401(client):
     """Test that DELETE /api/v1/profiles/{slug} without an admin key returns 401."""
     response = await client.delete("/api/v1/profiles/any-slug")
     assert response.status_code == 401
+
+
+async def test_create_profile_with_wrong_admin_key_returns_401(client):
+    """Test that POST /api/v1/profiles with an incorrect admin key returns 401."""
+    wrong_headers = {"X-Admin-API-Key": "this-is-not-the-right-key"}
+    profile_data = {
+        "slug": "wrong-key-test",
+        "name": "Wrong Key Test",
+        "os_support": ["LINUX"],
+        "python_versions": ["3.11"],
+    }
+    response = await client.post("/api/v1/profiles", json=profile_data, headers=wrong_headers)
+    assert response.status_code == 401
+    assert response.json()["detail"]["error"]["code"] == "INVALID_ADMIN_KEY"
+
+
+async def test_delete_profile_with_wrong_admin_key_returns_401(client):
+    """Test that DELETE /api/v1/profiles/{slug} with an incorrect admin key returns 401."""
+    wrong_headers = {"X-Admin-API-Key": "this-is-not-the-right-key"}
+    response = await client.delete("/api/v1/profiles/any-slug", headers=wrong_headers)
+    assert response.status_code == 401
+    assert response.json()["detail"]["error"]["code"] == "INVALID_ADMIN_KEY"

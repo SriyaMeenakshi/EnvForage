@@ -180,13 +180,28 @@ function WizardContent() {
                   key={p.slug} 
                   onClick={() => {
                     setSelectedProfile(p.slug);
-                    if (p.python_versions && p.python_versions.length > 0) {
+
+                    if (p.python_versions?.length > 0) {
                       setPythonVersion(p.python_versions[0]);
                     }
-                    if (p.cuda_required && p.cuda_versions && p.cuda_versions.length > 0) {
-                      setCudaVersion(p.cuda_versions[0]);
+
+                    const cudaVersions = p.cuda_versions ?? [];
+                    if (p.cuda_required && cudaVersions.length > 0) {
+                      setCudaVersion(cudaVersions[0]);
                     } else {
                       setCudaVersion("");
+                    }
+
+                    const isWin =
+                      p.os_support.includes("WIN") &&
+                      !p.os_support.includes("LINUX");
+
+                    if (isWin) {
+                      setTargetOs("WIN");
+
+                      setOutputFormats(prev =>
+                        prev.map(f => (f === "setup.sh" ? "setup.ps1" : f))
+                      );
                     }
                   }}
                   style={{ 
@@ -227,7 +242,7 @@ function WizardContent() {
                 setStep(3);
                 setGenerating(false);
               }}
-              title="EnvForge Script Compiler"
+              title="EnvForage Script Compiler"
             />
           ) : (
             <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-panel" style={{ padding: '2rem' }}>
@@ -365,7 +380,7 @@ function WizardContent() {
               </div>
               <div style={{ padding: '1.5rem', maxHeight: '400px', overflowY: 'auto' }}>
                 <SyntaxHighlighter language="bash" style={vscDarkPlus} customStyle={{ margin: 0, background: 'transparent' }}>
-                  {`# Your scripts have been generated and are ready to download.\n# Files included:\n${result.scripts.map(s => `# - ${s.filename} (${s.size_bytes} bytes)`).join('\n')}\n\n# Note: Scripts have passed the EnvForge Safety Filter.`}
+                  {`# Your scripts have been generated and are ready to download.\n# Files included:\n${result.scripts.map(s => `# - ${s.filename} (${s.size_bytes} bytes)`).join('\n')}\n\n# Note: Scripts have passed the EnvForage Safety Filter.`}
                 </SyntaxHighlighter>
               </div>
             </div>

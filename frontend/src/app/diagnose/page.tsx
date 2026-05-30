@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { UploadCloud, CheckCircle, AlertTriangle, ShieldAlert, Cpu, HardDrive, Monitor, Terminal } from "lucide-react";
+import { UploadCloud, ShieldAlert, Cpu, HardDrive, Monitor, Terminal } from "lucide-react";
 import { DiagnosticReport, DiagnosticResponse, Profile } from "../../types";
 import { api } from "../../services/api";
 import Link from "next/link";
@@ -232,7 +232,7 @@ export default function DiagnosePage() {
               onComplete={() => {
                 setVerifying(false);
               }}
-              title="EnvForge Diagnostic Compiler"
+              title="EnvForage Diagnostic Compiler"
             />
           ) : (
             <div className="glass-panel" style={{ padding: '2rem' }}>

@@ -2,11 +2,14 @@
 
 > **Production-Grade ML Environment Provisioning Platform**
 
-EnvForge is a developer tooling platform that generates intelligent, safe, and deterministic ML/AI environment setup scripts for Windows, WSL, Linux, and CUDA systems.
+EnvForge is an intelligent environment provisioning platform that automates one of the most frustrating parts of machine learning development: creating reliable and compatible development environments.
 
-Stop wrestling with CUDA version mismatches, Python dependency hell, and OS-specific setup quirks. EnvForge detects your hardware and generates the exact setup script you need for your chosen ML framework.
+By combining hardware diagnostics, compatibility-aware version resolution, template-driven script generation, and built-in safety validation, EnvForge enables developers to generate deterministic setup scripts for PyTorch, TensorFlow, CUDA, YOLO, and other ML ecosystems across Windows, WSL, and Linux.
 
----
+No more CUDA mismatches. No more dependency conflicts. No more hours spent debugging installation issues.
+
+**Generate. Verify. Deploy. Build AI with confidence.**
+
 
 ## 👥 Contributors
 
@@ -25,6 +28,7 @@ A massive thank you to all the developers who have contributed code, resolved is
 - [Contributors](#contributors)
 - [Features](#features)
 - [Architecture](#architecture)
+- [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
 - [Documentation Links](#documentation-links)
 - [Contributing](#contributing)
@@ -69,6 +73,66 @@ EnvForge is built with a modular, scalable architecture.
 For more details, see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ---
+## 📂 Project Structure
+
+```text
+EnvForage/
+├── .github/                  # GitHub templates, workflows, and automation
+│   ├── ISSUE_TEMPLATE/
+│   ├── workflows/
+│   ├── CODEOWNERS
+│   ├── dependabot.yml
+│   └── PULL_REQUEST_TEMPLATE.md
+│
+├── backend/                  # FastAPI backend and compatibility engine
+│   ├── alembic/              # Database migrations
+│   ├── app/
+│   │   ├── ai/               # AI troubleshooting logic
+│   │   ├── api/              # API routes
+│   │   ├── compatibility/    # CUDA/Framework compatibility engine
+│   │   ├── core/             # Core application logic
+│   │   ├── middleware/       # Custom middleware
+│   │   ├── models/           # Database models
+│   │   ├── schemas/          # Pydantic schemas
+│   │   ├── services/         # Business services
+│   │   └── templates/        # Script generation templates
+│   │
+│   ├── scripts/              # Utility scripts
+│   ├── seeds/                # Compatibility matrices and profiles
+│   ├── tests/                # Unit, integration, and API tests
+│   ├── Dockerfile
+│   └── pyproject.toml
+│
+├── frontend/                 # Next.js web application
+│   ├── public/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── diagnose/     # Environment diagnostics UI
+│   │   │   ├── generate/     # Script generation UI
+│   │   │   ├── profiles/     # Environment profiles
+│   │   │   └── troubleshoot/ # AI troubleshooting interface
+│   │   │
+│   │   ├── components/       # Reusable React components
+│   │   ├── services/         # API communication layer
+│   │   └── types/            # TypeScript types
+│   │
+│   ├── Dockerfile
+│   └── package.json
+│
+├── cli/                      # Standalone diagnostic CLI agent
+├── docs/                     # Project documentation
+│
+├── docker-compose.yml        # Development environment
+├── docker-compose.prod.yml   # Production deployment
+├── CONTRIBUTING.md           # Contribution guidelines
+├── CODE_OF_CONDUCT.md        # Community standards
+├── SECURITY.md               # Security policy
+├── TROUBLESHOOTING.md        # Common issues & fixes
+├── CHANGELOG.md              # Release history
+├── LICENSE
+└── README.md
+```
+
 
 ## 🚀 Quick Start
 
@@ -114,11 +178,20 @@ curl -X POST http://localhost:8000/api/v1/scripts/generate \
 
 ## 🤝 Contributing
 
-We love open source! Please read our [Contributing Guide](./CONTRIBUTING.md) to learn about:
-- Local development setup
-- Our branching and commit message strategy
-- How to add new templates or profiles
-- Writing tests for the Compatibility Engine
+We love open source! Contributions of all sizes are welcome — whether it's fixing bugs, improving documentation, adding new environment profiles, enhancing the compatibility engine, or proposing new features.
+
+Please read our [Contributing Guide](./CONTRIBUTING.md) before getting started. You'll find detailed instructions for:
+
+* Local development setup (Docker & non-Docker workflows)
+* Backend, frontend, and CLI development
+* Branching and commit message conventions
+* Adding new profiles and script templates
+* Testing requirements and quality standards
+* Pull request guidelines and code review expectations
+
+Before submitting a contribution, please ensure that all tests pass and relevant documentation is updated.
+
+Thank you for helping make EnvForge more reliable, safe, and developer-friendly!
 
 ---
 
