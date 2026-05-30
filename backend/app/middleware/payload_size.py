@@ -1,10 +1,10 @@
 """Middleware to reject HTTP request bodies exceeding a configurable byte limit."""
 
-from starlette.datastructures import Headers
-from starlette.responses import JSONResponse
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 # At the top of payload_size.py, add to imports:
 import json
+
+from starlette.datastructures import Headers
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 MAX_PAYLOAD_BYTES: int = 1 * 1024 * 1024  # 1 MB
 
@@ -78,7 +78,7 @@ async def _send_413(send: Send) -> None:
             (b"content-type", b"application/json"),
         ],
     })
-    
+
     body = json.dumps({
         "error": {
             "code": "PAYLOAD_TOO_LARGE",
