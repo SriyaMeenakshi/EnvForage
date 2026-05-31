@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
 	output: "standalone",
-	allowedDevOrigins: ["192.168.1.14"],
+	allowedDevOrigins: ["192.168.1.14", "192.168.1.37"],
 	async rewrites() {
 		const backendApiUrl =
 			process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL;

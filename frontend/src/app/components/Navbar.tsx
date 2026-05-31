@@ -113,6 +113,22 @@ export default function Navbar() {
 				<div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
 					<ThemeToggle />
 					<a
+						href="#"
+						target="_blank"
+						rel="noreferrer"
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: "0.5rem",
+							fontSize: "0.925rem",
+							fontWeight: 600,
+							color: "var(--text-secondary)",
+							textDecoration: "none",
+						}}
+					>
+						<span style={{ color: "#5865F2" }}>💬</span> Discord
+					</a>
+					<a
 						href="https://github.com/rishabh0510rishabh/EnvForage"
 						target="_blank"
 						rel="noreferrer"

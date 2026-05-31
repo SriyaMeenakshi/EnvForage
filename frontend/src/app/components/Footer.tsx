@@ -222,16 +222,17 @@ export default function Footer() {
 							}}
 						>
 							<Link
-								href="/coming-soon"
+								href="#"
+								target="_blank"
 								style={{
 									color: "var(--text-secondary)",
 									textDecoration: "none",
 								}}
 							>
-								Contribute
+								Join Discord
 							</Link>
 							<Link
-								href="https://github.com"
+								href="https://github.com/rishabh0510rishabh/EnvForage"
 								target="_blank"
 								style={{
 									color: "var(--text-secondary)",
@@ -250,7 +251,8 @@ export default function Footer() {
 								Report Issues
 							</Link>
 							<Link
-								href="/coming-soon"
+								href="https://github.com/rishabh0510rishabh/EnvForage/discussions"
+								target="_blank"
 								style={{
 									color: "var(--text-secondary)",
 									textDecoration: "none",
