@@ -33,6 +33,8 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import HTTPException, Request
+from redis.exceptions import ConnectionError as RedisConnError
+from redis.exceptions import TimeoutError as RedisTimeout
 
 from app.config import get_settings
 
@@ -301,22 +303,7 @@ class RateLimiter:
                 key, self.max_requests, self.window_seconds,
             )
         except Exception as exc:
-            # Determine whether this is a Redis connectivity problem.
-            # We import lazily so the module still works when redis is not
-            # installed (InMemoryBackend-only deployments).
-            _is_redis_error = False
-            try:
-                from redis.exceptions import (
-                    ConnectionError as _RedisConnError,
-                    TimeoutError as _RedisTimeout,
-                )
-                _is_redis_error = isinstance(exc, (_RedisConnError, _RedisTimeout))
-            except ImportError:
-                # redis package not present — any exception from a backend that
-                # somehow reached here is treated as a connection failure.
-                _is_redis_error = True
-
-            if _is_redis_error:
+            if isinstance(exc, (RedisConnError, RedisTimeout)):
                 logger.warning(
                     "Redis connection error during rate limit check for %s on %s "
                     "— falling back to in-memory backend. Error: %s",
