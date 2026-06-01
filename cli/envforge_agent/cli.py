@@ -28,6 +28,7 @@ from rich import box
 from envforge_agent import __version__
 from envforge_agent.report import ReportBuilder
 from envforge_agent.schemas import DiagnosticReport
+from envforge_agent.detectors import detect_wsl_gpu_passthrough
 
 from envforge_agent.utils import _map_os_to_target, _extract_python_version
 from envforge_agent.audit import audit_command
@@ -142,6 +143,13 @@ async def _diagnose(output: str | None, send: bool, api_url: str, quiet: bool, s
         )
 
     report = ReportBuilder(timeout=timeout).build()
+
+    if report.os.wsl_version == "WSL2":
+        wsl_gpu_ok, wsl_gpu_issues = detect_wsl_gpu_passthrough(timeout=timeout)
+        if not wsl_gpu_ok and not quiet:
+            click.echo("[!] GPU passthrough unavailable in WSL2. Falling back to CPU environment recommendation.")
+            for issue in wsl_gpu_issues:
+                click.echo(f"  - {issue}")
 
     if not quiet:
         _print_report_summary(report)

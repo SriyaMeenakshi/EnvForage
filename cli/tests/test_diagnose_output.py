@@ -96,3 +96,17 @@ class TestDiagnoseOutputFlag:
         parsed = json.loads(result.output)
         assert "agent_version" in parsed
         assert "os" in parsed
+    def test_wsl_gpu_passthrough_warning_printed(self) -> None:
+        from envforge_agent.cli import cli
+        from click.testing import CliRunner
+
+        with patch("envforge_agent.cli.ReportBuilder") as mock_builder:
+            mock_report = DiagnosticReport.model_validate(load_fixture("wsl_cuda.json"))
+            mock_builder.return_value.build.return_value = mock_report
+
+            with patch("envforge_agent.cli.detect_wsl_gpu_passthrough", return_value=(False, ["Missing /dev/dxg"])):
+                runner = CliRunner()
+                result = runner.invoke(cli, ["--no-color", "diagnose"])
+
+        assert result.exit_code == 0
+        assert "GPU passthrough unavailable in WSL2. Falling back to CPU environment recommendation." in result.output

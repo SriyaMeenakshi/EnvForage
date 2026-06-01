@@ -7,9 +7,12 @@ Never raises — returns empty list if nvidia-smi is not available.
 """
 from __future__ import annotations
 
+import os
+import stat
 import subprocess
 
 import logging
+from envforge_agent.detectors.os_detector import _detect_wsl
 from envforge_agent.schemas import GPUInfo
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,69 @@ def detect_gpus(timeout: int = 30) -> list[GPUInfo]:
         return _detect_via_rocm_smi(timeout=timeout)
     except Exception:
         return []
+
+
+def detect_wsl_gpu_passthrough(timeout: int = 30) -> tuple[bool, list[str]]:
+    """
+    Diagnose WSL2 GPU passthrough health.
+
+    Returns a tuple of (available, issues). When running under WSL2,
+    this checks /dev/dxg, nvidia-smi availability, and NVIDIA container
+    toolkit readiness.
+    """
+    issues: list[str] = []
+    if _detect_wsl() != "WSL2":
+        return True, issues
+
+    if not _check_dxg_present():
+        issues.append("Missing /dev/dxg — WSL GPU passthrough is unavailable.")
+
+    if not _check_nvidia_smi(timeout=timeout):
+        issues.append("`nvidia-smi` failed inside WSL2. Verify NVIDIA drivers and WSL integration.")
+
+    if not _check_nvidia_container_toolkit():
+        issues.append("NVIDIA container toolkit not available in WSL2. Docker GPU runtime may be broken.")
+
+    return len(issues) == 0, issues
+
+
+def _check_dxg_present() -> bool:
+    if not os.path.exists("/dev/dxg"):
+        return False
+
+    try:
+        mode = os.stat("/dev/dxg").st_mode
+        return stat.S_ISCHR(mode) or stat.S_ISBLK(mode)
+    except OSError:
+        return False
+
+
+def _check_nvidia_smi(timeout: int = 30) -> bool:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "-L"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, OSError):
+        return False
+
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def _check_nvidia_container_toolkit() -> bool:
+    try:
+        result = subprocess.run(
+            ["nvidia-container-cli", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, OSError):
+        return False
+
+    return result.returncode == 0
 
 
 def _detect_via_nvidia_smi(timeout: int = 30) -> list[GPUInfo]:

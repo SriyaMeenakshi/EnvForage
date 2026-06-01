@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import json
+import stat
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -219,7 +220,36 @@ class TestGPUDetector:
         with patch("subprocess.run", return_value=mock_result):
             result = detect_gpus()
         assert result[0].vram_gb == pytest.approx(8.0, abs=0.01)
+    def test_wsl_gpu_passthrough_reports_issues_when_dxg_missing(self) -> None:
+        from envforge_agent.detectors.gpu_detector import detect_wsl_gpu_passthrough
 
+        with patch("envforge_agent.detectors.gpu_detector._detect_wsl", return_value="WSL2"):
+            with patch("os.path.exists", return_value=False):
+                with patch("subprocess.run", side_effect=FileNotFoundError):
+                    ok, issues = detect_wsl_gpu_passthrough()
+
+        assert ok is False
+        assert any("/dev/dxg" in issue for issue in issues)
+        assert any("nvidia-smi" in issue for issue in issues)
+
+    def test_wsl_gpu_passthrough_ok_when_dxg_and_nvidia_available(self) -> None:
+        from envforge_agent.detectors.gpu_detector import detect_wsl_gpu_passthrough
+
+        mock_smi = MagicMock()
+        mock_smi.returncode = 0
+        mock_smi.stdout = "GPU 0: Test GPU"
+        mock_nct = MagicMock()
+        mock_nct.returncode = 0
+        mock_nct.stdout = "nvidia-container-cli 1.0"
+
+        with patch("envforge_agent.detectors.gpu_detector._detect_wsl", return_value="WSL2"):
+            with patch("os.path.exists", return_value=True):
+                with patch("os.stat", return_value=MagicMock(st_mode=stat.S_IFCHR)):
+                    with patch("subprocess.run", side_effect=[mock_smi, mock_nct]):
+                        ok, issues = detect_wsl_gpu_passthrough()
+
+        assert ok is True
+        assert issues == []
 
 # ── CUDA Detector tests ───────────────────────────────────────────────────────
 
