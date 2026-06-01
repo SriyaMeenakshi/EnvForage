@@ -1,7 +1,5 @@
 """Unit tests for the ML Framework Recommendation Engine."""
 
-import pytest
-
 from app.recommendation.engine import recommend_profiles
 from app.schemas.diagnostic import DiagnosticReportSchema
 
