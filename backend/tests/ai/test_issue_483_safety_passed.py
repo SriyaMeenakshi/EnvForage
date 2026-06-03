@@ -3,8 +3,9 @@ Tests for Issue #483 — safety_passed misused for DB persistence failure tracki
 Branch: fix/483-safety-passed-misuse
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
 
 class TestSafetyPassedNotMisused:
