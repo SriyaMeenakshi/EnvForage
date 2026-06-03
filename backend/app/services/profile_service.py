@@ -77,11 +77,22 @@ async def list_profiles(
     db: AsyncSession,
     filters: ProfileFilters,
     include_packages: bool = False,
-) -> tuple[list[EnvironmentProfile], int]:
+) -> tuple[list[Any], int]:
     """
     List environment profiles with optional filtering and pagination.
     Returns strictly ORM objects (profiles, total_count).
     """
+    redis = await get_redis_client()
+    cache_key = None
+    if redis:
+        filter_dict = filters.model_dump()
+        filter_str = json.dumps(filter_dict, sort_keys=True)
+        cache_key = f"profiles:list:{filter_str}"
+        cached_data = await redis.get(cache_key)
+        if cached_data:
+            data = json.loads(cached_data)
+            return data["profiles"], data["total"]
+
     query = (
         select(EnvironmentProfile)
         .where(EnvironmentProfile.deleted_at.is_(None))
@@ -131,6 +142,11 @@ async def list_profiles(
     result = await db.execute(query)
     profiles = list(result.scalars().all())
 
+    if redis and cache_key:
+        profiles_data = [ProfileSummarySchema.model_validate(p).model_dump(mode="json") for p in profiles]
+        cache_data = {"profiles": profiles_data, "total": total}
+        await redis.setex(cache_key, 300, json.dumps(cache_data))
+
     return profiles, total
 
 async def get_cached_profile_by_slug(
@@ -160,15 +176,28 @@ async def get_cached_profile_by_slug(
 async def get_profile_by_slug(
     db: AsyncSession,
     slug: str,
-) -> EnvironmentProfile | None:
-    """Get a single profile by slug, returning the ORM object."""
+) -> Any | None:
+    """Get a single profile by slug, including packages."""
+    redis = await get_redis_client()
+    cache_key = f"profiles:slug:{slug}"
+    if redis:
+        cached_data = await redis.get(cache_key)
+        if cached_data:
+            return json.loads(cached_data)
+
     result = await db.execute(
         select(EnvironmentProfile)
         .where(EnvironmentProfile.slug == slug)
         .where(EnvironmentProfile.deleted_at.is_(None))
         .options(selectinload(EnvironmentProfile.packages))
     )
-    return result.scalar_one_or_none()
+    profile = result.scalar_one_or_none()
+
+    if redis and profile:
+        profile_data = ProfileDetailSchema.model_validate(profile).model_dump(mode="json")
+        await redis.setex(cache_key, 300, json.dumps(profile_data))
+
+    return profile
 
 async def get_profile_by_id(
     db: AsyncSession,
