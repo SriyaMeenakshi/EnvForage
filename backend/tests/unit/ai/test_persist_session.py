@@ -47,9 +47,6 @@ def _make_llm_result():
 
 
 # ── Tests for _persist_session ────────────────────────────────────────────────
-
-
-@pytest.mark.asyncio
 async def test_persist_session_calls_rollback_on_db_error():
     """db.rollback() must be awaited when a DB error occurs during flush."""
     service = AITroubleshootService()
@@ -69,9 +66,6 @@ async def test_persist_session_calls_rollback_on_db_error():
         )
 
     assert db.rollback.call_count == 3
-
-
-@pytest.mark.asyncio
 async def test_persist_session_reraises_exception():
     """_persist_session must re-raise the DB exception after logging."""
     service = AITroubleshootService()
@@ -87,9 +81,6 @@ async def test_persist_session_reraises_exception():
             provider_name="TestProvider",
             model_name="test-model",
         )
-
-
-@pytest.mark.asyncio
 async def test_persist_session_logs_full_traceback_on_error():
     """logger.exception must be called (not logger.error) so traceback is captured."""
     service = AITroubleshootService()
@@ -114,9 +105,6 @@ async def test_persist_session_logs_full_traceback_on_error():
 
 
 # ── Tests for troubleshoot() audit propagation ────────────────────────────────
-
-
-@pytest.mark.asyncio
 async def test_troubleshoot_audit_marked_failed_when_persist_fails():
     """When _persist_session raises, _log_audit must be called with safety_passed=False."""
     service = AITroubleshootService()
@@ -155,9 +143,6 @@ async def test_troubleshoot_audit_marked_failed_when_persist_fails():
         call_kwargs = mock_log_audit.call_args.kwargs
         assert call_kwargs["safety_passed"] is False
         assert call_kwargs["safety_violation"] == "DB persistence failure"
-
-
-@pytest.mark.asyncio
 async def test_troubleshoot_audit_marked_passed_when_persist_succeeds():
     """When _persist_session succeeds, _log_audit must be called with safety_passed=True."""
     service = AITroubleshootService()
