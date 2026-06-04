@@ -5,7 +5,7 @@ Profile service — business logic for profile CRUD operations.
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,40 @@ async def get_all_active_profiles(
     return list(result.scalars().all())
 
 
+async def list_cached_profiles(
+    db: AsyncSession,
+    filters: ProfileFilters,
+    include_packages: bool = False,
+) -> tuple[list[dict[str, Any]], int]:
+    """
+    List environment profiles with optional filtering and pagination.
+    Returns cached response if available. Returns (profiles_dicts, total_count).
+    """
+    redis = await get_redis_client()
+    cache_key = None
+    if redis:
+        filter_dict = filters.model_dump()
+        filter_str = json.dumps(filter_dict, sort_keys=True)
+        cache_key = f"profiles:list:inc_pkgs={include_packages}:{filter_str}"
+        cached_data = await redis.get(cache_key)
+        if cached_data:
+            data = json.loads(cached_data)
+            return data["profiles"], data["total"]
+
+    profiles, total = await list_profiles(db, filters, include_packages)
+
+    if include_packages:
+        profiles_data = [ProfileDetailSchema.model_validate(p).model_dump(mode="json") for p in profiles]
+    else:
+        profiles_data = [ProfileSummarySchema.model_validate(p).model_dump(mode="json") for p in profiles]
+
+    if redis and cache_key:
+        cache_data = {"profiles": profiles_data, "total": total}
+        await redis.setex(cache_key, 300, json.dumps(cache_data))
+
+    return profiles_data, total
+
+
 async def list_profiles(
     db: AsyncSession,
     filters: ProfileFilters,
@@ -46,7 +80,7 @@ async def list_profiles(
 ) -> tuple[list[Any], int]:
     """
     List environment profiles with optional filtering and pagination.
-    Returns (profiles, total_count).
+    Returns strictly ORM objects (profiles, total_count).
     """
     redis = await get_redis_client()
     cache_key = None
@@ -79,7 +113,7 @@ async def list_profiles(
         for tag in filters.tags:
             query = query.where(EnvironmentProfile.tags.contains([tag]))
 
-    # Count total (before pagination) — apply same filters as main query
+    # Count total (before pagination) - apply same filters as main query
     from sqlalchemy import func
 
     count_query = (
@@ -115,6 +149,29 @@ async def list_profiles(
 
     return profiles, total
 
+async def get_cached_profile_by_slug(
+    db: AsyncSession,
+    slug: str,
+) -> dict[str, Any] | None:
+    """Get a single profile by slug (from cache if available) returning dictionary."""
+    redis = await get_redis_client()
+    cache_key = f"profiles:slug:{slug}"
+    if redis:
+        cached_data = await redis.get(cache_key)
+        if cached_data:
+            return cast(dict[str, Any], json.loads(cached_data))
+
+    profile = await get_profile_by_slug(db, slug)
+
+    if not profile:
+        return None
+
+    profile_data = ProfileDetailSchema.model_validate(profile).model_dump(mode="json")
+    if redis:
+        await redis.setex(cache_key, 300, json.dumps(profile_data))
+
+    return profile_data
+
 
 async def get_profile_by_slug(
     db: AsyncSession,
@@ -141,7 +198,6 @@ async def get_profile_by_slug(
         await redis.setex(cache_key, 300, json.dumps(profile_data))
 
     return profile
-
 
 async def get_profile_by_id(
     db: AsyncSession,
