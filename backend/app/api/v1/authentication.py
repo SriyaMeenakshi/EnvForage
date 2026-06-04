@@ -20,21 +20,60 @@ class RegData(BaseModel):
     fname: str
     lname: str
     email: EmailStr
-    password: str = Field(min_length=6, description="Must be at least 6 characters")
+    password: str = Field(
+        min_length=12,
+        description="Must be at least 12 characters with uppercase, lowercase, digit, and symbol"
+    )
 
     @field_validator("password")
     @classmethod
-    def password_max_bytes(cls, v: str) -> str:
-        """Enforce bcrypt's hard 72-byte limit on the UTF-8 encoded password.
+    def validate_password_strength(cls, v: str) -> str:
+        """Enforce strong password requirements to prevent dictionary attacks.
 
-        bcrypt silently truncates inputs longer than 72 bytes, meaning two
-        different passwords that share the same first 72 bytes would both
-        authenticate successfully.  We reject them early to avoid silent
-        data loss and auth ambiguity.  Byte length is checked (not character
-        count) so non-ASCII passwords are handled correctly.
+        Requirements:
+        - Minimum 12 characters (strong entropy)
+        - At least one uppercase letter (A-Z)
+        - At least one lowercase letter (a-z)
+        - At least one digit (0-9)
+        - At least one special character (!@#$%^&*)
+
+        bcrypt also has a hard 72-byte limit on UTF-8 encoded passwords.
+        Two different passwords that share the same first 72 bytes would
+        both authenticate successfully. We reject longer passwords early
+        to avoid silent data loss and auth ambiguity.
         """
+        if len(v) < 12:
+            raise ValueError(
+                "Password must be at least 12 characters long. "
+                "Shorter passwords are vulnerable to dictionary attacks."
+            )
+
         if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password must not exceed 72 bytes")
+            raise ValueError("Password must not exceed 72 bytes (UTF-8 encoded)")
+
+        # Check for uppercase letters
+        if not any(c.isupper() for c in v):
+            raise ValueError(
+                "Password must contain at least one uppercase letter (A-Z)"
+            )
+
+        # Check for lowercase letters
+        if not any(c.islower() for c in v):
+            raise ValueError(
+                "Password must contain at least one lowercase letter (a-z)"
+            )
+
+        # Check for digits
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit (0-9)")
+
+        # Check for special characters
+        special_chars = "!@#$%^&*()-_=+[]{}|;:',.<>?/~`"
+        if not any(c in special_chars for c in v):
+            raise ValueError(
+                f"Password must contain at least one special character from: {special_chars}"
+            )
+
         return v
 
 
